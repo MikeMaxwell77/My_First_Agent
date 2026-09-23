@@ -1,0 +1,1 @@
+I am building a simple coding agent with rag, tools, obervables, and security protocols.
