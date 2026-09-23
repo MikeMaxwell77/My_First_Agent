@@ -11,3 +11,4 @@ __pycache__/
 pytest-cache-files-*/
 
 .env
+logs/*.jsonl
