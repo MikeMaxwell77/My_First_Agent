@@ -1,6 +1,7 @@
 """Run all five evaluation cases and save one result per JSON line."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ def unavailable_tool(**_arguments):
 def main():
     load_dotenv(ROOT / ".env")
     cases = json.loads((ROOT / "evals" / "cases.json").read_text(encoding="utf-8"))
+    model = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
     log_path = ROOT / "logs" / "eval_results.jsonl"
     log_path.parent.mkdir(exist_ok=True)
     results = []
@@ -29,9 +31,10 @@ def main():
             for tool_name in case.get("unavailable_tools", []):
                 registry[tool_name] = unavailable_tool
 
-            run = run_agent(case["prompt"], tool_registry=registry)
+            run = run_agent(case["prompt"], tool_registry=registry, model=model)
             result = {
                 "case_id": case["case_id"],
+                "model": model,
                 "prompt": case["prompt"],
                 "final_answer": run["final_answer"],
                 "tools_called": [call["tool"] for call in run["tool_calls"]],

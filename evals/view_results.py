@@ -53,7 +53,18 @@ def bar(value, maximum, color, label):
     )
 
 
+def format_model_name(model):
+    if model.lower() == "gpt-5.6-luna":
+        return "GPT-5.6 Luna"
+    return model
+
+
 def build_report(results):
+    models = {str(row["model"]) for row in results if row.get("model")}
+    if not models:
+        # Older evaluation logs predate model metadata and used this project default.
+        models = {"gpt-5.6-luna"}
+    model_label = escape(", ".join(format_model_name(model) for model in sorted(models)))
     max_latency = max(float(row["latency_seconds"]) for row in results)
     max_activity = max(
         max(int(row["iteration_count"]), len(row["tool_calls"])) for row in results
@@ -98,12 +109,14 @@ def build_report(results):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent evaluation report</title>
+<title>Agent Evaluation Report</title>
 <style>
   :root {{ color-scheme: light; font-family: system-ui, sans-serif; background: #f5f7fb; color: #17243a; }}
   body {{ max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }}
   h1 {{ margin-bottom: 4px; }}
   .subtitle {{ color: #52627a; margin-top: 0; }}
+  .report-meta {{ display: flex; flex-wrap: wrap; gap: 8px 24px; color: #34445d; margin: 16px 0 8px; }}
+  .generated-note {{ color: #52627a; margin: 0 0 24px; }}
   .summary {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }}
   .metric, section {{ background: white; border: 1px solid #dbe2ed; border-radius: 12px; padding: 20px; }}
   .metric strong {{ display: block; font-size: 1.7rem; }}
@@ -135,8 +148,13 @@ def build_report(results):
 </style>
 </head>
 <body>
-<h1>Agent evaluation report</h1>
-<p class="subtitle">Saved case results · execution metrics only</p>
+<h1>Agent Evaluation Report</h1>
+<p class="subtitle">Prototype evaluation results</p>
+<div class="report-meta">
+  <span><strong>Model:</strong> {model_label}</span>
+  <span><strong>Test scenarios:</strong> {len(results)}</span>
+</div>
+<p class="generated-note"><em>Generated from the automated evaluation suite.</em></p>
 <div class="summary">
   <div class="metric"><strong>{len(results)}</strong><span>Cases</span></div>
   <div class="metric"><strong>{average_latency:.2f} s</strong><span>Average latency</span></div>
