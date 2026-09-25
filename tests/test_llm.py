@@ -1,13 +1,23 @@
-"""Optional manual API smoke test; not executed by pytest collection."""
+"""Explicitly invoked, single-request API smoke test; pytest never calls it."""
+import os
 
-from openai import OpenAI
-from dotenv import load_dotenv
+
+def main():
+    from dotenv import load_dotenv
+    from model_client import OpenAIModelClient
+    load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        print("SKIP: OPENAI_API_KEY is unavailable")
+        return
+    try:
+        response = OpenAIModelClient().generate(
+            [{"input": "Say that this is a fake banking prototype. Do not call tools."}], [])
+        assert response.final_answer
+        print("PASS: one API request returned a final answer")
+    except Exception as exc:
+        print(f"FAIL: smoke request failed ({type(exc).__name__}); no retry attempted")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
-    load_dotenv()
-    response = OpenAI().responses.create(
-        model="gpt-5.6-luna",
-        input="Explain what an AI agent is in exactly two sentences.",
-    )
-    print(response.output_text)
+    main()
