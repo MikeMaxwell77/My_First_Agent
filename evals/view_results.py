@@ -93,18 +93,11 @@ def build_report(results):
         trajectory = escape(json.dumps(calls, ensure_ascii=False, indent=2))
         prompt = escape(str(row.get("prompt", "")))
         answer = escape(str(row["final_answer"]))
-        grades = ""
-        if "outcome_pass" in row:
-            grades = (
-                f'<p><strong>Outcome:</strong> {"PASS" if row["outcome_pass"] else "FAIL"} '
-                f'<strong>Trajectory:</strong> {"PASS" if row["trajectory_pass"] else "FAIL"}</p>'
-                f'<pre>{escape(json.dumps({"outcome": row.get("outcome_invariants", {}), "trajectory": row.get("trajectory_invariants", {}), "failures": row.get("failure_reasons", [])}, indent=2))}</pre>'
-            )
         detail_rows.append(
             f'<details><summary>{case_id} <span>{latency:.2f} s · '
             f'{iterations} iterations · {len(calls)} calls</span></summary>'
             f'<p><strong>Prompt:</strong> {prompt}</p>'
-            f'<p><strong>Final answer:</strong> {answer}</p>{grades}'
+            f'<p><strong>Final answer:</strong> {answer}</p>'
             f'<p><strong>Tools:</strong> {tools}</p>'
             f'<pre aria-label="Tool call details">{trajectory}</pre></details>'
         )
@@ -179,7 +172,7 @@ def build_report(results):
   <h2>Case details</h2>
   {''.join(detail_rows)}
 </section>
-<p class="note">Graphs show speed and tool use. Where available, outcome and trajectory grades appear separately in each case. Scripted offline results validate the harness, not model reliability.</p>
+<p class="note">These graphs show speed and tool use. The saved results do not contain correctness grades.</p>
 </body>
 </html>
 """

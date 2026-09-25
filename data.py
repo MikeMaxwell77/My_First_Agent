@@ -60,8 +60,3 @@ POLICIES = {
     or make a final fraud determination.
     """
 }
-
-# Stable fake transaction identifiers; no financial execution exists.
-for customer_id, transactions in TRANSACTIONS.items():
-    for index, transaction in enumerate(transactions):
-        transaction["transaction_id"] = f"{customer_id}-{index + 1}"
