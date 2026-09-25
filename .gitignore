@@ -13,5 +13,3 @@ pytest-cache-files-*/
 .env
 logs/*.jsonl
 logs/*.html
-logs/*.json
-evals/*.html
