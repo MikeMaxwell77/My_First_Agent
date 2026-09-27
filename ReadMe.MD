@@ -20,6 +20,44 @@ To use other files, pass the input JSONL path and optional output HTML path:
 python evals/view_results.py path/to/results.jsonl path/to/report.html
 ```
 
+## Seed the PostgreSQL database
+
+After creating the tables with `database/schema.sql` and setting
+`DATABASE_URL` in `.env`, run from the project root with your virtual
+environment active:
+
+```powershell
+python -m database.seed
+```
+
+This adds five fictional customers and six transactions each (30 total),
+using parameterized SQL. All inserts commit together; a failure rolls back
+the batch. The script prints the inserted customer IDs and verifies the
+transaction count before committing. Each run adds another batch, so rerunning
+will create duplicate sample customers. Existing records are preserved.
+The transactions are illustrative samples, not complete account histories.
+
+## Database tools
+
+`get_customer`, `get_transaction`, `get_transactions`, and `search_policy` in `tools.py` read
+PostgreSQL using `DATABASE_URL`. Customer IDs are positive BIGINT values passed
+as strings (for example, `"1"`). `get_transaction("1")` retrieves a single
+transaction by its transaction ID, also a positive BIGINT passed as a string
+(maximum `9223372036854775807`). Policy topics are literal, case-insensitive
+substrings of the category, title, or content, with 1 to 200 nonblank characters.
+
+Each tool returns a JSON string with `status`, `data`, and `truncated` on
+success, or `status: "error"`, `code`, and `message` on failure. Transactions
+are ordered newest first. Lists contain at most 50 rows; text fields are capped
+at 4,000 characters. Truncated results must not be treated as complete evidence.
+Amounts are decimal strings and dates use ISO format.
+
+The seed script does not populate `policies`; searches return `NOT_FOUND` until
+matching policies exist. The tools do not fall back to `data.py`.
+
+Run the deterministic tests with `python -m pytest tests -q`. Database access
+is mocked, so these tests require neither a running database nor paid API calls.
+
 ## Contributors
 
 - Codex (OpenAI) — evaluation results report
