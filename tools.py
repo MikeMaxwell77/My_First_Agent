@@ -28,12 +28,12 @@ def _error(code, message):
     return json.dumps({"status": "error", "code": code, "message": message})
 
 
-def _valid_customer_id(customer_id):
+def _valid_bigint_id(value):
     # Preserve the public string parameter; PostgreSQL uses positive BIGINTs.
     return (
-        isinstance(customer_id, str)
-        and re.fullmatch(r"[1-9][0-9]{0,18}", customer_id) is not None
-        and int(customer_id) <= 9223372036854775807
+        isinstance(value, str)
+        and re.fullmatch(r"[1-9][0-9]{0,18}", value) is not None
+        and int(value) <= 9223372036854775807
     )
 
 
@@ -70,7 +70,7 @@ def _select(query, parameters, *, single=False):
 
 def get_customer(customer_id: str) -> str:
     """Retrieve one customer using a positive BIGINT ID encoded as a string."""
-    if not _valid_customer_id(customer_id):
+    if not _valid_bigint_id(customer_id):
         return _error("INVALID_INPUT", "customer_id must be a positive BIGINT encoded as a string.")
     return _select(
         "SELECT customer_id, name, account_type, courtesy_reversals, created_at "
@@ -81,13 +81,24 @@ def get_customer(customer_id: str) -> str:
 
 def get_transactions(customer_id: str) -> str:
     """Retrieve up to 50 transactions, newest first, for a validated customer ID."""
-    if not _valid_customer_id(customer_id):
+    if not _valid_bigint_id(customer_id):
         return _error("INVALID_INPUT", "customer_id must be a positive BIGINT encoded as a string.")
     return _select(
         "SELECT transaction_id, customer_id, merchant, amount, transaction_type, "
         "status, transaction_date FROM transactions WHERE customer_id = %s "
         "ORDER BY transaction_date DESC, transaction_id DESC LIMIT %s",
         (int(customer_id), MAX_ROWS + 1),
+    )
+
+
+def get_transaction(transaction_id: str) -> str:
+    """Retrieve one transaction using a positive BIGINT ID encoded as a string."""
+    if not _valid_bigint_id(transaction_id):
+        return _error("INVALID_INPUT", "transaction_id must be a positive BIGINT encoded as a string.")
+    return _select(
+        "SELECT transaction_id, customer_id, merchant, amount, transaction_type, "
+        "status, transaction_date FROM transactions WHERE transaction_id = %s LIMIT 1",
+        (int(transaction_id),), single=True,
     )
 
 

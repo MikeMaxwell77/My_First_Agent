@@ -6,16 +6,29 @@ import time
 
 from openai import OpenAI
 
-from tools import get_customer, get_transactions, search_policy
+from tools import get_customer, get_transaction, get_transactions, search_policy
 
 
 TOOL_REGISTRY = {
     "get_customer": get_customer,
     "get_transactions": get_transactions,
+    "get_transaction": get_transaction,
     "search_policy": search_policy,
 }
 
 TOOL_DEFINITIONS = [
+    {
+        "type": "function",
+        "name": "get_transaction",
+        "description": "Get one transaction by positive BIGINT transaction ID, encoded as a string.",
+        "parameters": {
+            "type": "object",
+            "properties": {"transaction_id": {"type": "string"}},
+            "required": ["transaction_id"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
     {
         "type": "function",
         "name": "get_customer",

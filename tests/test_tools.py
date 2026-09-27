@@ -34,6 +34,7 @@ def test_get_existing_customer(database):
 
 @pytest.mark.parametrize("function,arg", [
     (tools.get_customer, "999"), (tools.get_transactions, "999"),
+    (tools.get_transaction, "999"),
     (tools.search_policy, "mortgage"),
 ])
 def test_missing_records(database, function, arg):
@@ -44,8 +45,8 @@ def test_missing_records(database, function, arg):
 
 @pytest.mark.parametrize("value", [None, {}, 123, True, "", "0", "-1", "1.0",
                                    "1 OR 1=1", "9223372036854775808", "1" * 100])
-@pytest.mark.parametrize("function", [tools.get_customer, tools.get_transactions])
-def test_invalid_customer_id_does_not_connect(database, function, value):
+@pytest.mark.parametrize("function", [tools.get_customer, tools.get_transactions, tools.get_transaction])
+def test_invalid_id_does_not_connect(database, function, value):
     connect, _ = database
     assert json.loads(function(value))["code"] == "INVALID_INPUT"
     connect.assert_not_called()
@@ -103,7 +104,8 @@ def test_long_policy_is_bounded(database):
 
 
 @pytest.mark.parametrize("function,arg", [(tools.get_customer, "123"),
-    (tools.get_transactions, "123"), (tools.search_policy, "overdraft")])
+    (tools.get_transactions, "123"), (tools.get_transaction, "123"),
+    (tools.search_policy, "overdraft")])
 @pytest.mark.parametrize("stage", ["connect", "query"])
 def test_database_error_is_sanitized(database, function, arg, stage):
     connect, cursor = database
@@ -118,3 +120,27 @@ def test_missing_configuration_is_structured(database):
     connect, _ = database
     connect.side_effect = RuntimeError("DATABASE_URL is not configured")
     assert json.loads(tools.get_customer("123"))["code"] == "DATABASE_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("transaction_id", ["1", "9223372036854775807"])
+def test_get_transaction_by_bigint_id(database, transaction_id):
+    _, cursor = database
+    cursor.fetchmany.return_value = [{"transaction_id": int(transaction_id),
+                                     "customer_id": 123, "amount": Decimal("-35.00")}]
+    result = json.loads(tools.get_transaction(transaction_id))
+    assert result == {"status": "ok", "data": {
+        "transaction_id": int(transaction_id), "customer_id": 123,
+        "amount": "-35.00"}, "truncated": False}
+    query, params = cursor.execute.call_args.args
+    assert "WHERE transaction_id = %s LIMIT 1" in query
+    assert params == (int(transaction_id),)
+
+
+def test_get_transaction_is_registered():
+    from agent import TOOL_DEFINITIONS, TOOL_REGISTRY
+
+    assert TOOL_REGISTRY["get_transaction"] is tools.get_transaction
+    definition = next(tool for tool in TOOL_DEFINITIONS if tool["name"] == "get_transaction")
+    assert definition["parameters"]["required"] == ["transaction_id"]
+    assert definition["parameters"]["properties"] == {"transaction_id": {"type": "string"}}
+    assert definition["parameters"]["additionalProperties"] is False

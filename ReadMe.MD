@@ -39,9 +39,11 @@ The transactions are illustrative samples, not complete account histories.
 
 ## Database tools
 
-`get_customer`, `get_transactions`, and `search_policy` in `tools.py` read
+`get_customer`, `get_transaction`, `get_transactions`, and `search_policy` in `tools.py` read
 PostgreSQL using `DATABASE_URL`. Customer IDs are positive BIGINT values passed
-as strings (for example, `"1"`). Policy topics are literal, case-insensitive
+as strings (for example, `"1"`). `get_transaction("1")` retrieves a single
+transaction by its transaction ID, also a positive BIGINT passed as a string
+(maximum `9223372036854775807`). Policy topics are literal, case-insensitive
 substrings of the category, title, or content, with 1 to 200 nonblank characters.
 
 Each tool returns a JSON string with `status`, `data`, and `truncated` on
