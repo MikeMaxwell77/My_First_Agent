@@ -1,35 +1,38 @@
-### Skill: Agent Evaluation & Telemetry Suite Generator
+---
+name: agent-evaluation
+description: Revise this learning project's offline tests and evaluation logs, including token tracking.
+---
 
-#### Role & Purpose
-Provides standard schema specifications, metrics tracking guidelines, and structured logging formats for agent execution evaluation suites.
+# Agent Evaluation for a Learning Project
 
-#### Trigger Criteria
-- User requests code generation, architecture design, or schema definitions for logging, tracing, or evaluating agent execution outputs.
-- Applies to creating evaluation datasets, benchmark logging, or offline diagnostic runs.
-- DO NOT trigger for live database query tools or operational runtime tool wrappers.
+Keep the suite small and readable, using plain Python and pytest. Apply this
+guidance to testing and evaluation logging, not database tool design.
 
-#### Schema & Recorded Metrics
-Each evaluation record must be logged as a validated JSON object or line-delimited JSON (JSONL) entry with the following typed fields:
+## Tests and evaluations
 
-1. **Session Identifiers:**
-   - `trace_id` (string/UUID): Unique identifier for the execution trace.
-   - `timestamp` (string/ISO-8601): UTC timestamp of invocation.
-2. **Input / Output Payload:**
-   - `user_input` (string): The raw prompt or user query provided to the agent loop.
-   - `final_response` (string): The generated output returned to the user.
-   - `outcome_status` (string/Enum): Standardized result indicator (`"SUCCESS"`, `"FAILURE"`, `"HANDLED_ERROR"`).
-   - `task_metadata` (object/dict): Flexible key-value store for domain-specific metrics (e.g., `{"fee_reversal_applied": true}`).
-3. **Execution & Tool Telemetry:**
-   - `iterations` (integer): Total number of model calls / loop iterations executed.
-   - `tools_called` (array of objects): Ordered list of invoked tools:
-     - `tool_name` (string): Name of the invoked tool.
-     - `arguments` (object): Parameters supplied to the tool call.
-     - `result_status` (string): `"SUCCESS"` or `"ERROR"`.
-4. **Performance & Token Metrics:**
-   - `latency_ms` (integer): End-to-end execution time in milliseconds.
-   - `token_usage` (object): `{"prompt_tokens": int, "completion_tokens": int, "total_tokens": int}`.
+- Use fake model responses and mocked tools in tests; no paid API calls or live
+  database access during pytest runs.
+- Check final responses and execution trajectories together: tool names,
+  arguments, results/errors, and the iteration limit.
+- Keep live behavioral evaluations in `evals/` as manually invoked runs.
+  Review whether answers follow policy and are supported by tool results.
+  A plausible answer or short runtime alone does not prove correctness.
 
-#### Operational Constraints
-- **Asynchronous Logging:** Telemetry recording MUST run non-blocking (asynchronously) so logging overhead does not bloat end-user latency.
-- **Payload Truncation:** Large tool results or prompt histories MUST be capped/truncated (e.g., max 2,000 characters per field) before persisting to evaluation storage.
-- **Schema Validation:** Logged items MUST pass JSON Schema or Pydantic validation before writing to log sinks to prevent corrupt evaluation datasets.
+## Minimal evaluation record
+
+Keep the existing JSONL format and field names:
+
+- `case_id`, `model`, `prompt`, and `final_answer`
+- `tools_called`: ordered tool names
+- `tool_calls`: ordered tool names, arguments, and results or errors
+- `iteration_count` and `latency_seconds`
+- `token_usage`: `input_tokens`, `output_tokens`, and `total_tokens`, summed
+  across every model response, including the final answer and runs that reach
+  the iteration limit. Use API-reported counts, not text-length estimates.
+  If any response lacks usage, record `null` for the run rather than partial
+  totals. Older logs may omit this field.
+
+Simple synchronous JSONL writing is sufficient. Do not require schema libraries,
+async logging, trace IDs, outcome enums, or a telemetry framework for this
+prototype. Add complexity only for a concrete learning goal.
+Never log credentials. Consider payload caps if log size becomes a problem.

@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from agent import TOOL_REGISTRY, run_agent  # noqa: E402
+from evals.view_results import build_report  # noqa: E402
 
 
 def unavailable_tool(**_arguments):
@@ -41,14 +42,21 @@ def main():
                 "tool_calls": run["tool_calls"],
                 "iteration_count": run["iteration_count"],
                 "latency_seconds": run["latency_seconds"],
+                "token_usage": run["token_usage"],
             }
             log_file.write(json.dumps(result) + "\n")
             results.append(result)
 
+    report_path = ROOT / "logs" / "eval_report.html"
+    report_path.write_text(build_report(results), encoding="utf-8")
     print(f"Ran {len(results)} cases; wrote {log_path}")
+    print(f"Wrote {report_path}")
     for result in results:
         tools = ", ".join(result["tools_called"]) or "none"
-        print(f"- {result['case_id']}: {result['iteration_count']} iterations, tools: {tools}")
+        usage = result["token_usage"]
+        tokens = usage["total_tokens"] if usage is not None else "unavailable"
+        print(f"- {result['case_id']}: {result['iteration_count']} iterations, "
+              f"tools: {tools}, tokens: {tokens}")
 
 
 if __name__ == "__main__":
