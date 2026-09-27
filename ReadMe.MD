@@ -20,6 +20,23 @@ To use other files, pass the input JSONL path and optional output HTML path:
 python evals/view_results.py path/to/results.jsonl path/to/report.html
 ```
 
+## Seed the PostgreSQL database
+
+After creating the tables with `database/schema.sql` and setting
+`DATABASE_URL` in `.env`, run from the project root with your virtual
+environment active:
+
+```powershell
+python -m database.seed
+```
+
+This adds five fictional customers and six transactions each (30 total),
+using parameterized SQL. All inserts commit together; a failure rolls back
+the batch. The script prints the inserted customer IDs and verifies the
+transaction count before committing. Each run adds another batch, so rerunning
+will create duplicate sample customers. Existing records are preserved.
+The transactions are illustrative samples, not complete account histories.
+
 ## Contributors
 
 - Codex (OpenAI) — evaluation results report
