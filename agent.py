@@ -84,6 +84,7 @@ def run_agent(prompt, client=None, tool_registry=None, model=None, max_iteration
     registry = tool_registry or TOOL_REGISTRY
     model = model or os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
     trace = []
+    token_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
     previous_response_id = None
     next_input = prompt
     started = time.perf_counter()
@@ -99,6 +100,12 @@ def run_agent(prompt, client=None, tool_registry=None, model=None, max_iteration
             request["previous_response_id"] = previous_response_id
 
         response = client.responses.create(**request)
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            token_usage = None  # Partial usage is not a complete total.
+        elif token_usage is not None:
+            for field in token_usage:
+                token_usage[field] += getattr(usage, field)
         calls = [item for item in response.output if item.type == "function_call"]
 
         if not calls:
@@ -106,6 +113,7 @@ def run_agent(prompt, client=None, tool_registry=None, model=None, max_iteration
                 "final_answer": response.output_text,
                 "tool_calls": trace,
                 "iteration_count": iteration,
+                "token_usage": token_usage,
                 "latency_seconds": round(time.perf_counter() - started, 3),
             }
 
@@ -136,5 +144,6 @@ def run_agent(prompt, client=None, tool_registry=None, model=None, max_iteration
         "final_answer": "I could not determine eligibility within the tool-call limit.",
         "tool_calls": trace,
         "iteration_count": max_iterations,
+        "token_usage": token_usage,
         "latency_seconds": round(time.perf_counter() - started, 3),
     }
