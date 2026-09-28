@@ -21,8 +21,12 @@ Customer, Tool, and Attack.
 
 Click a bar, line dot, or pie slice to open and briefly highlight its case in
 the details list. Pie legend entries also link to their cases.
-Cases with tool errors appear in red, with their tool names and error codes in
-the details. Use **Only cases with tool errors** to focus on them.
+Cases are blue by default, or red when a tool reports an error. The report
+shows tool names and error codes in the details; use **Only cases with tool
+errors** to focus on them. In **Case colors**, assign a suggested or custom
+color to a category or tag. Tag rules take priority over category rules, and
+the **All** category target colors every case. **Clear all colors** restores
+the blue and red defaults.
 
 To rebuild the report from saved results without calling the model, run
 `python evals/view_results.py`.

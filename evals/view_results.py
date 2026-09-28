@@ -208,6 +208,11 @@ def build_report(results):
   .tag-control {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
   .tag-control span {{ overflow-wrap: anywhere; }}
   .tag-control select {{ flex: none; }}
+  .palette {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }}
+  .palette-color {{ width: 31px; height: 31px; padding: 0; border: 2px solid white; border-radius: 50%; background: var(--swatch); box-shadow: 0 0 0 1px #52627a; }}
+  .palette-color[aria-pressed="true"] {{ box-shadow: 0 0 0 3px #17243a; }}
+  .color-rule {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 0; border-top: 1px solid #dbe2ed; }}
+  .color-rule strong {{ min-width: 180px; overflow-wrap: anywhere; }}
   .chart-card {{ border: 1px solid #dbe2ed; border-radius: 10px; padding: 16px; margin: 16px 0; }}
   .chart-card .controls {{ margin-bottom: 12px; }}
   .chart-scroll {{ overflow-x: auto; }}
@@ -217,10 +222,10 @@ def build_report(results):
   .legend {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 12px; margin-top: 12px; }}
   .legend-item {{ display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }}
   .swatch {{ flex: none; width: 12px; height: 12px; border-radius: 3px; }}
-  details.case {{ border-top: 1px solid #dbe2ed; padding: 12px 0; }}
-  details.case.has-error {{ border-left: 4px solid #c0392b; padding-left: 12px; }}
-  .error-pill {{ display: inline-block; float: none; margin-left: 8px; padding: 2px 7px; border-radius: 5px; background: #fce7e4; color: #a3291d; font-size: .8rem; }}
-  .error-list {{ margin: 12px 0; padding: 12px; border-radius: 6px; background: #fff0ed; color: #76231d; }}
+  details.case {{ --case-color: #2866c9; --case-tint: #2866c922; border-top: 1px solid #dbe2ed; border-left: 4px solid var(--case-color); padding: 12px 0 12px 12px; }}
+  details.case.has-error {{ --case-color: #c0392b; --case-tint: #c0392b22; }}
+  .error-pill {{ display: inline-block; float: none; margin-left: 8px; padding: 2px 7px; border: 1px solid var(--case-color); border-radius: 5px; background: var(--case-tint); color: #17243a; font-size: .8rem; }}
+  .error-list {{ margin: 12px 0; padding: 12px; border-left: 3px solid var(--case-color); border-radius: 6px; background: var(--case-tint); color: #17243a; }}
   .error-list ul {{ margin: 6px 0 0; padding-left: 20px; }}
   details.case.jump-highlight {{ background: #fff2bd; box-shadow: 0 0 0 4px #f0bb38; border-radius: 6px; }}
   summary {{ cursor: pointer; font-weight: 600; }}
@@ -248,7 +253,7 @@ def build_report(results):
 <section aria-label="Case filters">
   <h2>Filter cases</h2>
   <div class="controls"><label>Category:
-    <select id="category-filter"><option value="">All categories</option>{category_options}</select>
+    <select id="category-filter"><option value="">All</option>{category_options}</select>
   </label><label><input id="errors-only" type="checkbox"> Only cases with tool errors</label>
   <button id="clear-filters" type="button">Clear filters</button></div>
   <p id="filter-count" aria-live="polite">Showing {len(results)} of {len(results)} cases</p>
@@ -259,6 +264,27 @@ def build_report(results):
     <div class="tag-groups">{''.join(tag_groups) or 'No tags in these results.'}</div>
   </details>
   <p class="note">Included tags must all match. Any excluded tag removes a case.</p>
+</section>
+<section aria-label="Case colors">
+  <h2>Case colors</h2>
+  <p class="note">Cases are blue by default and red when a tool reports an error. All colors every case; a specific category takes priority over All, and a matching tag takes priority over categories. The newest matching tag rule wins.</p>
+  <div class="controls">
+    <label>Apply to: <select id="color-target-type"><option value="category">Category</option><option value="tag">Tag</option></select></label>
+    <label>Category or tag: <select id="color-target"></select></label>
+    <label>Color: <input id="rule-color" type="color" value="#2866c9"></label>
+  </div>
+  <div class="palette" role="group" aria-label="Suggested colors">
+    <span>Suggested:</span>
+    <button type="button" class="palette-color" data-color="#c0392b" aria-label="Red" title="Red" style="--swatch: #c0392b"></button>
+    <button type="button" class="palette-color" data-color="#e67e22" aria-label="Orange" title="Orange" style="--swatch: #e67e22"></button>
+    <button type="button" class="palette-color" data-color="#f1c40f" aria-label="Yellow" title="Yellow" style="--swatch: #f1c40f"></button>
+    <button type="button" class="palette-color" data-color="#27ae60" aria-label="Green" title="Green" style="--swatch: #27ae60"></button>
+    <button type="button" class="palette-color" data-color="#2866c9" aria-label="Blue" title="Blue" style="--swatch: #2866c9"></button>
+    <button type="button" class="palette-color" data-color="#8e44ad" aria-label="Purple" title="Purple" style="--swatch: #8e44ad"></button>
+  </div>
+  <div class="controls"><button id="add-color-rule" type="button">Apply color</button>
+    <button id="clear-color-rules" type="button">Clear all colors</button></div>
+  <div id="color-rules" aria-live="polite">No color overrides.</div>
 </section>
 <section aria-label="Charts">
   <div class="controls"><h2>Charts</h2><button id="add-chart" type="button">Add chart</button></div>

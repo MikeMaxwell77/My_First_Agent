@@ -35,9 +35,15 @@ by `evals/run_evals.py`. Keep the report self-contained and readable in a browse
   groups tag controls by their prefix in a separate, taller expandable section
   and shows how many cases match. Older log entries without category, name,
   tags, or token usage still render.
-- Tool exceptions and structured tool results with `status: "error"` are shown
-  in red on chart points and case details. The report lists each tool and error
-  code, counts affected cases, and can show only cases with tool errors.
+- Cases are blue by default (blue shades in pie charts); tool exceptions and
+  structured tool results with `status: "error"` are red by default. Viewers
+  can assign one of six suggested colors or a custom color to a category or
+  tag. The All category target colors every case. A specific category rule
+  overrides All, then tag rules override category rules; the latest added
+  matching tag rule wins. Custom rules override defaults, including error red. Each rule
+  can be edited or removed; Clear all colors restores the defaults. The report
+  lists each tool and error code, counts affected cases, and can show only
+  cases with tool errors.
   `NOT_FOUND` and `INVALID_INPUT` are tool error codes, not answer grades.
 - The report does not grade answers for correctness. Latency and tool activity
   describe execution, not whether the agent followed policy.
