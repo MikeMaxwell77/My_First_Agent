@@ -37,3 +37,5 @@ Simple synchronous JSONL writing is sufficient. Do not require schema libraries,
 async logging, trace IDs, outcome enums, or a telemetry framework for this
 prototype. Add complexity only for a concrete learning goal.
 Never log credentials. Consider payload caps if log size becomes a problem.
+
+For the report's current behavior and editing guidance, see [eval-report.md](eval-report.md).
