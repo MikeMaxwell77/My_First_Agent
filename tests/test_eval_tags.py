@@ -28,7 +28,7 @@ def test_case_tags_cover_expected_tools_and_render_in_report():
              "latency_seconds": 0.1, "iteration_count": 1, "tool_calls": []}
             for case in cases]
     report = build_report(rows)
-    assert report.count('data-case-index=') == len(cases)
+    assert report.count('<details class="case" data-case-index=') == len(cases)
     assert 'data-tag="attack:prompt_injection"' in report
     assert '<option value="security">security</option>' in report
     assert "Showing 35 of 35 cases" in report
@@ -36,6 +36,8 @@ def test_case_tags_cover_expected_tools_and_render_in_report():
     assert 'class="metric-select"' in report
     assert 'class="type-select"' in report
     assert 'value="pie"' in report
+    assert 'function jumpToCase(index)' in report
+    assert 'data-case-index="0"' in report
 
 
 def test_report_exposes_numeric_metrics_and_escapes_embedded_data():

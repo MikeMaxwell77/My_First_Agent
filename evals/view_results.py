@@ -158,10 +158,13 @@ def build_report(results):
   .chart-card .controls {{ margin-bottom: 12px; }}
   .chart-scroll {{ overflow-x: auto; }}
   .chart-scroll svg {{ display: block; }}
+  .chart-point {{ cursor: pointer; }}
+  .chart-point:focus-visible {{ outline: 3px solid #c46000; outline-offset: 3px; }}
   .legend {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 12px; margin-top: 12px; }}
   .legend-item {{ display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }}
   .swatch {{ flex: none; width: 12px; height: 12px; border-radius: 3px; }}
   details.case {{ border-top: 1px solid #dbe2ed; padding: 12px 0; }}
+  details.case.jump-highlight {{ background: #fff2bd; box-shadow: 0 0 0 4px #f0bb38; border-radius: 6px; }}
   summary {{ cursor: pointer; font-weight: 600; }}
   summary span {{ float: right; font-weight: 400; color: #52627a; }}
   details p {{ line-height: 1.5; overflow-wrap: anywhere; }}
@@ -195,7 +198,7 @@ def build_report(results):
 <section aria-label="Charts">
   <div class="controls"><h2>Charts</h2><button id="add-chart" type="button">Add chart</button></div>
   <div id="charts"></div>
-  <p class="note">Line charts connect cases in result order. Pie charts show each case's share of a nonnegative total. Cases without the selected metric are omitted from that chart.</p>
+  <p class="note">Click a bar, line dot, or pie slice to open its case below. Line charts connect cases in result order. Pie charts show each case's share of a nonnegative total. Cases without the selected metric are omitted from that chart.</p>
 </section>
 <section aria-label="Case details">
   <h2>Case details</h2>

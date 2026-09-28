@@ -1,12 +1,45 @@
 "use strict";
 
 const cases = JSON.parse(document.getElementById("chart-data").textContent);
+cases.forEach((item, index) => { item.caseIndex = index; });
 const metricKeys = [...new Set(cases.flatMap(item => Object.keys(item.metrics)))].sort();
 const tagFilters = [...document.querySelectorAll("select[data-tag]")];
 const categoryFilter = document.getElementById("category-filter");
 const charts = document.getElementById("charts");
 const svgNamespace = "http://www.w3.org/2000/svg";
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 });
+let highlightedDetail = null;
+let highlightTimer = null;
+
+function jumpToCase(index) {
+  const detail = document.querySelector(`#case-details details[data-case-index="${index}"]`);
+  if (!detail || detail.hidden) return;
+  if (highlightedDetail) highlightedDetail.classList.remove("jump-highlight");
+  clearTimeout(highlightTimer);
+  highlightedDetail = detail;
+  detail.open = true;
+  detail.classList.add("jump-highlight");
+  detail.scrollIntoView({ behavior: "smooth", block: "center" });
+  detail.querySelector("summary").focus({ preventScroll: true });
+  highlightTimer = setTimeout(() => {
+    detail.classList.remove("jump-highlight");
+    if (highlightedDetail === detail) highlightedDetail = null;
+  }, 2200);
+}
+
+function makeCaseLink(element, point) {
+  element.classList.add("chart-point");
+  element.setAttribute("role", "button");
+  element.setAttribute("tabindex", "0");
+  element.setAttribute("aria-label", `View case ${point.id} in case details`);
+  element.addEventListener("click", () => jumpToCase(point.caseIndex));
+  element.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      jumpToCase(point.caseIndex);
+    }
+  });
+}
 
 function labelForMetric(key) {
   return key.replaceAll(".", " / ").replaceAll("_", " ");
@@ -53,7 +86,7 @@ function drawCartesian(container, points, type) {
   const y = value => top + (maximum - value) / (maximum - minimum) * plotHeight;
   const svg = svgElement("svg", {
     width, height, viewBox: `0 0 ${width} ${height}`,
-    role: "img", "aria-label": `${type} chart of ${points.length} cases`
+    role: "group", "aria-label": `${type} chart of ${points.length} cases`
   });
 
   for (let tick = 0; tick <= 4; tick++) {
@@ -83,9 +116,10 @@ function drawCartesian(container, points, type) {
       const title = svgElement("title");
       title.textContent = tooltip;
       rect.append(title);
+      makeCaseLink(rect, point);
       svg.append(rect);
     } else {
-      coordinates.push([x, yy, tooltip]);
+      coordinates.push({ x, yy, tooltip, point });
     }
     svgText(svg, point.id, {
       x, y: height - bottom + 16, transform: `rotate(-45 ${x} ${height - bottom + 16})`,
@@ -94,14 +128,15 @@ function drawCartesian(container, points, type) {
   });
   if (type === "line") {
     svg.append(svgElement("polyline", {
-      points: coordinates.map(([x, yy]) => `${x},${yy}`).join(" "),
+      points: coordinates.map(({ x, yy }) => `${x},${yy}`).join(" "),
       fill: "none", stroke: "#19856d", "stroke-width": 3
     }));
-    for (const [x, yy, tooltip] of coordinates) {
-      const circle = svgElement("circle", { cx: x, cy: yy, r: 5, fill: "#19856d" });
+    for (const { x, yy, tooltip, point } of coordinates) {
+      const circle = svgElement("circle", { cx: x, cy: yy, r: 7, fill: "#19856d" });
       const title = svgElement("title");
       title.textContent = tooltip;
       circle.append(title);
+      makeCaseLink(circle, point);
       svg.append(circle);
     }
   }
@@ -116,7 +151,7 @@ function drawPie(container, points) {
   }
   const svg = svgElement("svg", {
     width: 460, height: 360, viewBox: "0 0 460 360",
-    role: "img", "aria-label": `Pie chart of ${points.length} cases`
+    role: "group", "aria-label": `Pie chart of ${points.length} cases`
   });
   const legend = document.createElement("div");
   legend.className = "legend";
@@ -141,6 +176,7 @@ function drawPie(container, points) {
       const title = svgElement("title");
       title.textContent = `${point.id}: ${numberFormat.format(point.value)} (${numberFormat.format(point.value / total * 100)}%)`;
       slice.append(title);
+      makeCaseLink(slice, point);
       svg.append(slice);
     }
     angle += sweep;
@@ -152,6 +188,7 @@ function drawPie(container, points) {
     const text = document.createElement("span");
     text.textContent = `${point.id}: ${numberFormat.format(point.value)} (${numberFormat.format(point.value / total * 100)}%)`;
     item.append(swatch, text);
+    makeCaseLink(item, point);
     legend.append(item);
   });
   container.append(svg, legend);
@@ -164,7 +201,8 @@ function renderChart(card, filtered) {
   const note = card.querySelector(".chart-note");
   canvas.replaceChildren();
   const points = filtered.filter(item => Object.hasOwn(item.metrics, metric))
-    .map(item => ({ id: item.id, name: item.name, value: item.metrics[metric] }));
+    .map(item => ({ id: item.id, name: item.name, caseIndex: item.caseIndex,
+                    value: item.metrics[metric] }));
   note.textContent = `${points.length} of ${filtered.length} filtered cases have ${labelForMetric(metric)}.`;
   if (!points.length) {
     canvas.textContent = "No values to chart for this selection.";

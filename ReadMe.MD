@@ -16,6 +16,9 @@ a case to inspect its prompt, final answer, and tools used. These are execution
 metrics; the current JSONL does not contain correctness grades. Running
 evaluations calls the model and may incur API costs.
 
+Click a bar, line dot, or pie slice to open and briefly highlight its case in
+the details list. Pie legend entries also link to their cases.
+
 To rebuild the report from saved results without calling the model, run
 `python evals/view_results.py`.
 

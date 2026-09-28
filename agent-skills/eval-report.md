@@ -27,6 +27,9 @@ by `evals/run_evals.py`. Keep the report self-contained and readable in a browse
   counted and omitted from that chart. Pie charts require nonnegative values
   with a positive total and show each case's share. Line charts connect cases
   in the saved result order; they do not imply a time series.
+- Clicking a bar, line dot, pie slice, or pie legend item opens the matching
+  case in the details list, scrolls to it, and highlights it briefly. Chart
+  points support Enter and Space for keyboard use.
 - Category and tag selectors filter all charts and case details together.
   Included tags all must match; any excluded tag removes a case. The report
   shows how many cases match. Older log entries without category, name, tags,
