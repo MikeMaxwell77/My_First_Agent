@@ -18,17 +18,26 @@ by `evals/run_evals.py`. Keep the report self-contained and readable in a browse
 - `evals/eval_report.html` is maintained manually. Do not update it as part of
   report generation.
 - The report shows the model and case count, average latency and tool calls,
-  latency and activity charts, and expandable case details. Details include
-  the case name (when present), category, tags, prompt, final answer, tools
-  called, and the tool-call trace.
-- Category and tag selectors can be combined. They filter both charts and case
-  details, and the report shows how many cases match. Older log entries without
-  category, name, or tags still render.
+  configurable charts, and expandable case details. Details include the case
+  name (when present), category, tags, prompt, final answer, tools called, and
+  the tool-call trace.
+- A chart can use any finite numeric value saved for a case, including nested
+  token usage, or the derived tool-call count. Users can add multiple charts
+  and choose bar, line, or pie for each. Cases missing the selected metric are
+  counted and omitted from that chart. Pie charts require nonnegative values
+  with a positive total and show each case's share. Line charts connect cases
+  in the saved result order; they do not imply a time series.
+- Category and tag selectors filter all charts and case details together.
+  Included tags all must match; any excluded tag removes a case. The report
+  shows how many cases match. Older log entries without category, name, tags,
+  or token usage still render.
 - The report does not grade answers for correctness. Latency and tool activity
   describe execution, not whether the agent followed policy.
 
 ## When editing
 
-Keep HTML text escaped, and retain support for existing JSONL logs that lack
-newer metadata. Test rendering with saved or synthetic results; report tests
-must not call the model or database.
+Keep HTML text escaped and embedded chart data safe for a `<script>` element.
+`evals/report_script.js` is embedded into the generated HTML so the report
+still opens as one file. Retain support for existing JSONL logs that lack newer
+metadata. Test rendering with saved or synthetic results; report tests must not
+call the model or database.

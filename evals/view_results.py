@@ -44,13 +44,27 @@ def read_results(path):
     return results
 
 
-def bar(value, maximum, color, label):
-    width = 100 * value / maximum if maximum else 0
-    return (
-        f'<span class="bar-track"><span class="bar {color}" '
-        f'style="width: {width:.1f}%"></span></span>'
-        f'<span class="value">{escape(label)}</span>'
-    )
+def numeric_metrics(row):
+    """Flatten finite numeric evaluation fields and add a tool-call count."""
+    metrics = {"tool_call_count": len(row["tool_calls"])}
+
+    def collect(name, value):
+        if isinstance(value, bool):
+            return
+        if isinstance(value, (int, float)):
+            try:
+                if math.isfinite(value):
+                    metrics[name] = value
+            except OverflowError:
+                pass  # Too large for browser chart coordinates.
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                collect(f"{name}.{key}", item)
+
+    for key, value in row.items():
+        if key not in {"tool_calls", "tools_called"}:
+            collect(key, value)
+    return metrics
 
 
 def format_model_name(model):
@@ -62,60 +76,58 @@ def format_model_name(model):
 def build_report(results):
     models = {str(row["model"]) for row in results if row.get("model")}
     if not models:
-        # Older evaluation logs predate model metadata and used this project default.
         models = {"gpt-5.6-luna"}
     model_label = escape(", ".join(format_model_name(model) for model in sorted(models)))
-    max_latency = max(float(row["latency_seconds"]) for row in results)
-    max_activity = max(
-        max(int(row["iteration_count"]), len(row["tool_calls"])) for row in results
-    )
-    latency_rows = []
-    activity_rows = []
-    detail_rows = []
-    all_tags = sorted({tag for row in results for tag in row.get("tags", [])})
-    all_categories = sorted({str(row["category"]) for row in results if row.get("category")})
-
-    for row in results:
-        case_id = escape(str(row["case_id"]))
-        case_id_attr = escape(str(row["case_id"]), quote=True)
-        latency = float(row["latency_seconds"])
-        iterations = int(row["iteration_count"])
-        calls = row["tool_calls"]
-        latency_rows.append(
-            f'<div class="chart-row" data-case-id="{case_id_attr}"><span class="case">{case_id}</span>'
-            f'{bar(latency, max_latency, "latency", f"{latency:.2f} s")}</div>'
-        )
-        activity_rows.append(
-            f'<div class="chart-row" data-case-id="{case_id_attr}"><span class="case">{case_id}</span>'
-            f'<div class="stack">'
-            f'{bar(iterations, max_activity, "iterations", f"{iterations} iterations")}'
-            f'{bar(len(calls), max_activity, "calls", f"{len(calls)} tool calls")}'
-            f'</div></div>'
-        )
-        tools = ", ".join(escape(str(call.get("tool", "unknown"))) for call in calls) or "None"
-        trajectory = escape(json.dumps(calls, ensure_ascii=False, indent=2))
-        prompt = escape(str(row.get("prompt", "")))
-        answer = escape(str(row["final_answer"]))
-        tags = row.get("tags", [])
-        tag_list = " ".join(f'<span class="tag">{escape(tag)}</span>' for tag in tags)
-        tag_data = escape(json.dumps(tags), quote=True)
-        category_data = escape(str(row.get("category", "")), quote=True)
-        case_name = escape(str(row.get("name", "")))
-        detail_rows.append(
-            f'<details data-case-id="{case_id_attr}" data-category="{category_data}" '
-            f'data-tags="{tag_data}"><summary>{case_id}'
-            f'{f" — {case_name}" if case_name else ""} <span>{latency:.2f} s · '
-            f'{iterations} iterations · {len(calls)} calls</span></summary>'
-            f'<p><strong>Category:</strong> {escape(str(row.get("category", "unknown")))}</p>'
-            f'<p><strong>Tags:</strong> {tag_list or "None"}</p>'
-            f'<p><strong>Prompt:</strong> {prompt}</p>'
-            f'<p><strong>Final answer:</strong> {answer}</p>'
-            f'<p><strong>Tools:</strong> {tools}</p>'
-            f'<pre aria-label="Tool call details">{trajectory}</pre></details>'
-        )
-
     average_latency = sum(float(row["latency_seconds"]) for row in results) / len(results)
     average_calls = sum(len(row["tool_calls"]) for row in results) / len(results)
+
+    chart_cases = []
+    detail_rows = []
+    for row in results:
+        case_id = str(row["case_id"])
+        category = str(row.get("category", ""))
+        tags = [str(tag) for tag in row.get("tags", [])]
+        name = str(row.get("name", ""))
+        metrics = numeric_metrics(row)
+        chart_cases.append({"id": case_id, "name": name, "category": category,
+                            "tags": tags, "metrics": metrics})
+
+        calls = row["tool_calls"]
+        tools = ", ".join(escape(str(call.get("tool", "unknown"))) for call in calls) or "None"
+        tag_list = " ".join(f'<span class="tag">{escape(tag)}</span>' for tag in tags) or "None"
+        title = escape(case_id) + (" - " + escape(name) if name else "")
+        detail_rows.append(
+            f'<details class="case" data-case-index="{len(chart_cases) - 1}">'
+            f'<summary>{title} <span>{len(calls)} tool calls</span></summary>'
+            f'<p><strong>Category:</strong> {escape(category or "unknown")}</p>'
+            f'<p><strong>Tags:</strong> {tag_list}</p>'
+            f'<p><strong>Prompt:</strong> {escape(str(row.get("prompt", "")))}</p>'
+            f'<p><strong>Final answer:</strong> {escape(str(row["final_answer"]))}</p>'
+            f'<p><strong>Tools:</strong> {tools}</p>'
+            f'<pre aria-label="Tool call details">'
+            f'{escape(json.dumps(calls, ensure_ascii=False, indent=2))}</pre></details>'
+        )
+
+    categories = sorted({case["category"] for case in chart_cases if case["category"]})
+    tags = sorted({tag for case in chart_cases for tag in case["tags"]})
+    category_options = "".join(
+        f'<option value="{escape(category, quote=True)}">{escape(category)}</option>'
+        for category in categories
+    )
+    tag_controls = "".join(
+        f'<label class="tag-control"><span>{escape(tag)}</span>'
+        f'<select data-tag="{escape(tag, quote=True)}" aria-label="Filter {escape(tag, quote=True)}">'
+        '<option value="">Any</option><option value="include">Include</option>'
+        '<option value="exclude">Exclude</option></select></label>'
+        for tag in tags
+    )
+    chart_data = json.dumps(chart_cases, ensure_ascii=False, allow_nan=False)
+    for old, new in (("&", "\\u0026"), ("<", "\\u003c"),
+                     (">", "\\u003e"), ("\u2028", "\\u2028"),
+                     ("\u2029", "\\u2029")):
+        chart_data = chart_data.replace(old, new)
+    script = Path(__file__).with_name("report_script.js").read_text(encoding="utf-8")
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -124,42 +136,39 @@ def build_report(results):
 <title>Agent Evaluation Report</title>
 <style>
   :root {{ color-scheme: light; font-family: system-ui, sans-serif; background: #f5f7fb; color: #17243a; }}
-  body {{ max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }}
+  body {{ max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }}
   h1 {{ margin-bottom: 4px; }}
-  .subtitle {{ color: #52627a; margin-top: 0; }}
-  .report-meta {{ display: flex; flex-wrap: wrap; gap: 8px 24px; color: #34445d; margin: 16px 0 8px; }}
-  .generated-note {{ color: #52627a; margin: 0 0 24px; }}
+  .subtitle, .note, .chart-note {{ color: #52627a; }}
+  .subtitle {{ margin-top: 0; }}
+  .report-meta, .controls {{ display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }}
+  .report-meta {{ margin: 16px 0; }}
   .summary {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }}
   .metric, section {{ background: white; border: 1px solid #dbe2ed; border-radius: 12px; padding: 20px; }}
   .metric strong {{ display: block; font-size: 1.7rem; }}
-  .metric span, .note {{ color: #52627a; font-size: .9rem; }}
+  .metric span {{ color: #52627a; font-size: .9rem; }}
   section {{ margin-top: 16px; }}
   h2 {{ margin: 0 0 18px; font-size: 1.2rem; }}
-  .chart-row {{ display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 1fr); gap: 16px; align-items: center; margin: 14px 0; }}
-  .case {{ font-size: .9rem; overflow-wrap: anywhere; }}
-  .chart-row > .bar-track, .stack .bar-track {{ min-width: 0; }}
-  .chart-row:has(> .bar-track) {{ grid-template-columns: minmax(150px, 230px) minmax(0, 1fr) 78px; }}
-  .bar-track {{ display: block; height: 18px; border-radius: 5px; background: #edf1f7; overflow: hidden; }}
-  .bar {{ display: block; height: 100%; border-radius: 5px; }}
-  .latency {{ background: #2866c9; }}
-  .iterations {{ background: #19856d; }}
-  .calls {{ background: #b76528; }}
-  .value {{ font-size: .85rem; white-space: nowrap; color: #52627a; }}
-  .stack {{ display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 5px 10px; align-items: center; }}
-  details {{ border-top: 1px solid #dbe2ed; padding: 12px 0; }}
-  details:first-of-type {{ border-top: 0; }}
+  button, select {{ font: inherit; padding: 5px 8px; }}
+  button {{ cursor: pointer; }}
+  .tag-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 16px; max-height: 230px; overflow: auto; padding: 12px 0; }}
+  .tag-control {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
+  .tag-control span {{ overflow-wrap: anywhere; }}
+  .tag-control select {{ flex: none; }}
+  .chart-card {{ border: 1px solid #dbe2ed; border-radius: 10px; padding: 16px; margin: 16px 0; }}
+  .chart-card .controls {{ margin-bottom: 12px; }}
+  .chart-scroll {{ overflow-x: auto; }}
+  .chart-scroll svg {{ display: block; }}
+  .legend {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 12px; margin-top: 12px; }}
+  .legend-item {{ display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }}
+  .swatch {{ flex: none; width: 12px; height: 12px; border-radius: 3px; }}
+  details.case {{ border-top: 1px solid #dbe2ed; padding: 12px 0; }}
   summary {{ cursor: pointer; font-weight: 600; }}
   summary span {{ float: right; font-weight: 400; color: #52627a; }}
   details p {{ line-height: 1.5; overflow-wrap: anywhere; }}
   .tag {{ display: inline-block; margin: 2px 4px 2px 0; padding: 3px 7px; border-radius: 5px; background: #edf1f7; font-size: .8rem; }}
-  .tag-filter {{ margin-bottom: 12px; }}
-  [hidden] {{ display: none !important; }}
   pre {{ white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fb; padding: 12px; border-radius: 6px; font-size: .8rem; }}
-  @media (max-width: 640px) {{
-    .summary {{ grid-template-columns: 1fr; }}
-    .chart-row, .chart-row:has(> .bar-track) {{ grid-template-columns: 1fr; gap: 5px; }}
-    summary span {{ float: none; display: block; }}
-  }}
+  [hidden] {{ display: none !important; }}
+  @media (max-width: 640px) {{ .summary {{ grid-template-columns: 1fr; }} summary span {{ float: none; display: block; }} }}
 </style>
 </head>
 <body>
@@ -169,58 +178,32 @@ def build_report(results):
   <span><strong>Model:</strong> {model_label}</span>
   <span><strong>Test scenarios:</strong> {len(results)}</span>
 </div>
-<p class="generated-note"><em>Generated from the automated evaluation suite.</em></p>
 <div class="summary">
   <div class="metric"><strong>{len(results)}</strong><span>Cases</span></div>
   <div class="metric"><strong>{average_latency:.2f} s</strong><span>Average latency</span></div>
   <div class="metric"><strong>{average_calls:.1f}</strong><span>Average tool calls</span></div>
 </div>
-<section aria-label="Latency by case">
-  <h2>Latency by case</h2>
-  {''.join(latency_rows)}
-</section>
-<section aria-label="Iterations and tool calls by case">
-  <h2>Iterations and tool calls by case</h2>
-  {''.join(activity_rows)}
-</section>
-<section>
-  <h2>Case details</h2>
-  <label class="tag-filter">Category:
-    <select id="category-filter"><option value="">All categories</option>
-      {''.join(f'<option value="{escape(category, quote=True)}">{escape(category)}</option>' for category in all_categories)}
-    </select>
-  </label>
-  <label class="tag-filter">Tag:
-    <select id="tag-filter"><option value="">All cases</option>
-      {''.join(f'<option value="{escape(tag, quote=True)}">{escape(tag)}</option>' for tag in all_tags)}
-    </select>
-  </label>
+<section aria-label="Case filters">
+  <h2>Filter cases</h2>
+  <div class="controls"><label>Category:
+    <select id="category-filter"><option value="">All categories</option>{category_options}</select>
+  </label><button id="clear-filters" type="button">Clear filters</button></div>
+  <details><summary>Include or exclude tags</summary><div class="tag-grid">{tag_controls or 'No tags in these results.'}</div></details>
   <p id="filter-count" aria-live="polite">Showing {len(results)} of {len(results)} cases</p>
-  {''.join(detail_rows)}
+  <p class="note">Included tags must all match. Any excluded tag removes a case.</p>
 </section>
-<p class="note">These graphs show speed and tool use. The saved results do not contain correctness grades.</p>
-<script>
-  const tagFilter = document.getElementById('tag-filter');
-  const categoryFilter = document.getElementById('category-filter');
-  function applyFilters() {{
-    const visibleIds = new Set();
-    document.querySelectorAll('details[data-tags]').forEach(detail => {{
-      const matchesTag = !tagFilter.value ||
-        JSON.parse(detail.dataset.tags).includes(tagFilter.value);
-      const matchesCategory = !categoryFilter.value ||
-        detail.dataset.category === categoryFilter.value;
-      detail.hidden = !(matchesTag && matchesCategory);
-      if (!detail.hidden) visibleIds.add(detail.dataset.caseId);
-    }});
-    document.querySelectorAll('.chart-row[data-case-id]').forEach(row => {{
-      row.hidden = !visibleIds.has(row.dataset.caseId);
-    }});
-    document.getElementById('filter-count').textContent =
-      `Showing ${{visibleIds.size}} of {len(results)} cases`;
-  }}
-  tagFilter.addEventListener('change', applyFilters);
-  categoryFilter.addEventListener('change', applyFilters);
-</script>
+<section aria-label="Charts">
+  <div class="controls"><h2>Charts</h2><button id="add-chart" type="button">Add chart</button></div>
+  <div id="charts"></div>
+  <p class="note">Line charts connect cases in result order. Pie charts show each case's share of a nonnegative total. Cases without the selected metric are omitted from that chart.</p>
+</section>
+<section aria-label="Case details">
+  <h2>Case details</h2>
+  <div id="case-details">{''.join(detail_rows)}</div>
+</section>
+<p class="note">Charts show execution metrics. These results do not contain correctness grades.</p>
+<script type="application/json" id="chart-data">{chart_data}</script>
+<script>{script}</script>
 </body>
 </html>
 """
