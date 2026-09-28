@@ -1,4 +1,4 @@
-"""Run all five evaluation cases and save one result per JSON line."""
+"""Run evaluation cases and save JSONL results and an HTML report."""
 
 import json
 import os
@@ -34,7 +34,10 @@ def main():
 
             run = run_agent(case["prompt"], tool_registry=registry, model=model)
             result = {
-                "case_id": case["case_id"],
+                "case_id": case["id"],
+                "category": case["category"],
+                "name": case["name"],
+                "tags": case["tags"],
                 "model": model,
                 "prompt": case["prompt"],
                 "final_answer": run["final_answer"],
