@@ -9,10 +9,20 @@ python evals/run_evals.py
 ```
 
 Open `logs/eval_report.html` in a browser. The report reads the saved
-`logs/eval_results.jsonl` file and shows latency plus iteration and tool-call
-counts for each case. Filter cases by tag, or expand one to inspect its prompt,
-final answer, and tools used. These are execution metrics; the current JSONL does not contain
-correctness grades. Running evaluations calls the model and may incur API costs.
+`logs/eval_results.jsonl` file. Add bar, line, or pie charts for any numeric
+case metric, including token usage and tool-call count. Include or exclude tags
+and filter by category; the filters apply to all charts and case details. Expand
+a case to inspect its prompt, final answer, and tools used. These are execution
+metrics; the current JSONL does not contain correctness grades. Running
+evaluations calls the model and may incur API costs.
+
+Tag filters have their own expandable section, grouped by tag category such as
+Customer, Tool, and Attack.
+
+Click a bar, line dot, or pie slice to open and briefly highlight its case in
+the details list. Pie legend entries also link to their cases.
+Cases with tool errors appear in red, with their tool names and error codes in
+the details. Use **Only cases with tool errors** to focus on them.
 
 To rebuild the report from saved results without calling the model, run
 `python evals/view_results.py`.
