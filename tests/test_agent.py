@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from agent import run_agent
+from evals.run_evals import repeating_customer_client
 
 
 def response(calls=(), usage=(10, 5, 15)):
@@ -67,3 +68,21 @@ def test_tool_error_preserves_trace_and_token_usage():
     assert run["tool_calls"][0]["error"] == "RuntimeError: Data unavailable"
     assert run["final_answer"] == "Cannot determine eligibility."
     assert run["token_usage"]["total_tokens"] == 30
+
+
+def test_scripted_repeated_customer_calls_hit_iteration_limit():
+    customer = Mock(return_value='{"status":"ok"}')
+    run = run_agent("Check customer 1", client=repeating_customer_client("1"),
+                    tool_registry={"get_customer": customer}, max_iterations=3)
+    assert run["iteration_count"] == 3
+    assert [call["tool"] for call in run["tool_calls"]] == ["get_customer"] * 3
+    assert customer.call_count == 3
+    assert "tool-call limit" in run["final_answer"]
+
+
+def test_case_can_offer_only_its_allowed_tools():
+    client = SimpleNamespace(responses=SimpleNamespace(create=Mock(return_value=response())))
+    definitions = [{"type": "function", "name": "get_customer"}]
+    run_agent("What type of account does customer 1 have?", client=client,
+              tool_registry={"get_customer": Mock()}, tool_definitions=definitions)
+    assert client.responses.create.call_args.kwargs["tools"] == definitions
