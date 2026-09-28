@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from agent import run_agent
+from agent import TOOL_DEFINITIONS, TOOL_REGISTRY, run_agent
 from evals.run_evals import repeating_customer_client
 
 
@@ -80,9 +80,10 @@ def test_scripted_repeated_customer_calls_hit_iteration_limit():
     assert "tool-call limit" in run["final_answer"]
 
 
-def test_case_can_offer_only_its_allowed_tools():
+def test_normal_agent_runs_offer_all_registered_tools():
     client = SimpleNamespace(responses=SimpleNamespace(create=Mock(return_value=response())))
-    definitions = [{"type": "function", "name": "get_customer"}]
-    run_agent("What type of account does customer 1 have?", client=client,
-              tool_registry={"get_customer": Mock()}, tool_definitions=definitions)
-    assert client.responses.create.call_args.kwargs["tools"] == definitions
+    run_agent("What type of account does customer 1 have?", client=client)
+    offered = client.responses.create.call_args.kwargs["tools"]
+    assert {definition["name"] for definition in offered} == set(TOOL_REGISTRY)
+    assert offered == TOOL_DEFINITIONS
+    assert "search_policy" in TOOL_REGISTRY
