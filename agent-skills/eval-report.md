@@ -32,8 +32,9 @@ by `evals/run_evals.py`. Keep the report self-contained and readable in a browse
   points support Enter and Space for keyboard use.
 - Category and tag selectors filter all charts and case details together.
   Included tags all must match; any excluded tag removes a case. The report
-  shows how many cases match. Older log entries without category, name, tags,
-  or token usage still render.
+  groups tag controls by their prefix in a separate, taller expandable section
+  and shows how many cases match. Older log entries without category, name,
+  tags, or token usage still render.
 - The report does not grade answers for correctness. Latency and tool activity
   describe execution, not whether the agent followed policy.
 

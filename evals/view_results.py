@@ -114,13 +114,28 @@ def build_report(results):
         f'<option value="{escape(category, quote=True)}">{escape(category)}</option>'
         for category in categories
     )
-    tag_controls = "".join(
-        f'<label class="tag-control"><span>{escape(tag)}</span>'
-        f'<select data-tag="{escape(tag, quote=True)}" aria-label="Filter {escape(tag, quote=True)}">'
-        '<option value="">Any</option><option value="include">Include</option>'
-        '<option value="exclude">Exclude</option></select></label>'
-        for tag in tags
-    )
+    tags_by_category = {}
+    for tag in tags:
+        category, separator, value = tag.partition(":")
+        if not separator:
+            category, value = "other", tag
+        tags_by_category.setdefault(category, []).append((tag, value))
+    preferred_order = {name: index for index, name in enumerate(
+        ("customer", "tool", "evidence", "behavior", "attack"))}
+    tag_groups = []
+    for category in sorted(tags_by_category,
+                           key=lambda name: (preferred_order.get(name, len(preferred_order)), name)):
+        controls = "".join(
+            f'<label class="tag-control"><span>{escape(value.replace("_", " "))}</span>'
+            f'<select data-tag="{escape(tag, quote=True)}" aria-label="Filter {escape(tag, quote=True)}">'
+            '<option value="">Any</option><option value="include">Include</option>'
+            '<option value="exclude">Exclude</option></select></label>'
+            for tag, value in tags_by_category[category]
+        )
+        tag_groups.append(
+            f'<fieldset class="tag-group"><legend>{escape(category.replace("_", " ").title())}</legend>'
+            f'<div class="tag-grid">{controls}</div></fieldset>'
+        )
     chart_data = json.dumps(chart_cases, ensure_ascii=False, allow_nan=False)
     for old, new in (("&", "\\u0026"), ("<", "\\u003c"),
                      (">", "\\u003e"), ("\u2028", "\\u2028"),
@@ -150,7 +165,10 @@ def build_report(results):
   h2 {{ margin: 0 0 18px; font-size: 1.2rem; }}
   button, select {{ font: inherit; padding: 5px 8px; }}
   button {{ cursor: pointer; }}
-  .tag-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 16px; max-height: 230px; overflow: auto; padding: 12px 0; }}
+  .tag-groups {{ max-height: min(70vh, 720px); overflow-y: auto; padding: 12px 4px; }}
+  .tag-group {{ border: 1px solid #dbe2ed; border-radius: 8px; margin: 0 0 14px; padding: 12px; }}
+  .tag-group legend {{ font-weight: 600; padding: 0 6px; }}
+  .tag-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 16px; }}
   .tag-control {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
   .tag-control span {{ overflow-wrap: anywhere; }}
   .tag-control select {{ flex: none; }}
@@ -191,8 +209,13 @@ def build_report(results):
   <div class="controls"><label>Category:
     <select id="category-filter"><option value="">All categories</option>{category_options}</select>
   </label><button id="clear-filters" type="button">Clear filters</button></div>
-  <details><summary>Include or exclude tags</summary><div class="tag-grid">{tag_controls or 'No tags in these results.'}</div></details>
   <p id="filter-count" aria-live="polite">Showing {len(results)} of {len(results)} cases</p>
+</section>
+<section aria-label="Tag categories">
+  <h2>Tag categories</h2>
+  <details><summary>Include or exclude tags by category</summary>
+    <div class="tag-groups">{''.join(tag_groups) or 'No tags in these results.'}</div>
+  </details>
   <p class="note">Included tags must all match. Any excluded tag removes a case.</p>
 </section>
 <section aria-label="Charts">

@@ -31,6 +31,10 @@ def test_case_tags_cover_expected_tools_and_render_in_report():
     assert report.count('<details class="case" data-case-index=') == len(cases)
     assert 'data-tag="attack:prompt_injection"' in report
     assert '<option value="security">security</option>' in report
+    assert '<section aria-label="Tag categories">' in report
+    assert report.index('<legend>Customer</legend>') < report.index('<legend>Tool</legend>')
+    assert report.index('<legend>Tool</legend>') < report.index('<legend>Attack</legend>')
+    assert 'max-height: min(70vh, 720px)' in report
     assert "Showing 35 of 35 cases" in report
     assert "Ignore previous instructions injection" in report
     assert 'class="metric-select"' in report

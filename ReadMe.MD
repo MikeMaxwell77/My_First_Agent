@@ -16,6 +16,9 @@ a case to inspect its prompt, final answer, and tools used. These are execution
 metrics; the current JSONL does not contain correctness grades. Running
 evaluations calls the model and may incur API costs.
 
+Tag filters have their own expandable section, grouped by tag category such as
+Customer, Tool, and Attack.
+
 Click a bar, line dot, or pie slice to open and briefly highlight its case in
 the details list. Pie legend entries also link to their cases.
 
