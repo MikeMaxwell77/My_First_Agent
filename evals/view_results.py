@@ -46,7 +46,8 @@ def read_results(path):
 
 def numeric_metrics(row):
     """Flatten finite numeric evaluation fields and add a tool-call count."""
-    metrics = {"tool_call_count": len(row["tool_calls"])}
+    metrics = {"tool_call_count": len(row["tool_calls"]),
+               "tool_error_count": len(tool_errors(row))}
 
     def collect(name, value):
         if isinstance(value, bool):
@@ -67,6 +68,27 @@ def numeric_metrics(row):
     return metrics
 
 
+def tool_errors(row):
+    """Collect explicit tool exceptions and structured error results."""
+    errors = []
+    for call in row["tool_calls"]:
+        tool = str(call.get("tool", "unknown"))
+        if call.get("error"):
+            errors.append({"tool": tool, "code": "EXCEPTION",
+                           "message": str(call["error"])})
+            continue
+        result = call.get("result")
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except (ValueError, TypeError):
+                continue
+        if isinstance(result, dict) and (result.get("status") == "error" or result.get("error")):
+            errors.append({"tool": tool, "code": str(result.get("code") or "ERROR"),
+                           "message": str(result.get("message") or result.get("error") or "")})
+    return errors
+
+
 def format_model_name(model):
     if model.lower() == "gpt-5.6-luna":
         return "GPT-5.6 Luna"
@@ -83,22 +105,36 @@ def build_report(results):
 
     chart_cases = []
     detail_rows = []
+    error_case_count = 0
     for row in results:
         case_id = str(row["case_id"])
         category = str(row.get("category", ""))
         tags = [str(tag) for tag in row.get("tags", [])]
         name = str(row.get("name", ""))
         metrics = numeric_metrics(row)
+        errors = tool_errors(row)
+        error_case_count += bool(errors)
         chart_cases.append({"id": case_id, "name": name, "category": category,
-                            "tags": tags, "metrics": metrics})
+                            "tags": tags, "metrics": metrics, "errorCount": len(errors)})
 
         calls = row["tool_calls"]
         tools = ", ".join(escape(str(call.get("tool", "unknown"))) for call in calls) or "None"
         tag_list = " ".join(f'<span class="tag">{escape(tag)}</span>' for tag in tags) or "None"
         title = escape(case_id) + (" - " + escape(name) if name else "")
+        error_badge = (f'<span class="error-pill">{len(errors)} tool errors</span>'
+                       if errors else "")
+        error_details = "".join(
+            f'<li><strong>{escape(error["tool"])}: {escape(error["code"])}</strong>'
+            f'{" - " + escape(error["message"]) if error["message"] else ""}</li>'
+            for error in errors
+        )
+        error_section = (f'<div class="error-list"><strong>Tool errors</strong>'
+                         f'<ul>{error_details}</ul></div>' if errors else "")
         detail_rows.append(
-            f'<details class="case" data-case-index="{len(chart_cases) - 1}">'
-            f'<summary>{title} <span>{len(calls)} tool calls</span></summary>'
+            f'<details class="case{" has-error" if errors else ""}" '
+            f'data-case-index="{len(chart_cases) - 1}">'
+            f'<summary>{title} {error_badge}<span>{len(calls)} tool calls</span></summary>'
+            f'{error_section}'
             f'<p><strong>Category:</strong> {escape(category or "unknown")}</p>'
             f'<p><strong>Tags:</strong> {tag_list}</p>'
             f'<p><strong>Prompt:</strong> {escape(str(row.get("prompt", "")))}</p>'
@@ -157,7 +193,7 @@ def build_report(results):
   .subtitle {{ margin-top: 0; }}
   .report-meta, .controls {{ display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }}
   .report-meta {{ margin: 16px 0; }}
-  .summary {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }}
+  .summary {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }}
   .metric, section {{ background: white; border: 1px solid #dbe2ed; border-radius: 12px; padding: 20px; }}
   .metric strong {{ display: block; font-size: 1.7rem; }}
   .metric span {{ color: #52627a; font-size: .9rem; }}
@@ -182,6 +218,10 @@ def build_report(results):
   .legend-item {{ display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }}
   .swatch {{ flex: none; width: 12px; height: 12px; border-radius: 3px; }}
   details.case {{ border-top: 1px solid #dbe2ed; padding: 12px 0; }}
+  details.case.has-error {{ border-left: 4px solid #c0392b; padding-left: 12px; }}
+  .error-pill {{ display: inline-block; float: none; margin-left: 8px; padding: 2px 7px; border-radius: 5px; background: #fce7e4; color: #a3291d; font-size: .8rem; }}
+  .error-list {{ margin: 12px 0; padding: 12px; border-radius: 6px; background: #fff0ed; color: #76231d; }}
+  .error-list ul {{ margin: 6px 0 0; padding-left: 20px; }}
   details.case.jump-highlight {{ background: #fff2bd; box-shadow: 0 0 0 4px #f0bb38; border-radius: 6px; }}
   summary {{ cursor: pointer; font-weight: 600; }}
   summary span {{ float: right; font-weight: 400; color: #52627a; }}
@@ -203,12 +243,14 @@ def build_report(results):
   <div class="metric"><strong>{len(results)}</strong><span>Cases</span></div>
   <div class="metric"><strong>{average_latency:.2f} s</strong><span>Average latency</span></div>
   <div class="metric"><strong>{average_calls:.1f}</strong><span>Average tool calls</span></div>
+  <div class="metric"><strong>{error_case_count}</strong><span>Cases with tool errors</span></div>
 </div>
 <section aria-label="Case filters">
   <h2>Filter cases</h2>
   <div class="controls"><label>Category:
     <select id="category-filter"><option value="">All categories</option>{category_options}</select>
-  </label><button id="clear-filters" type="button">Clear filters</button></div>
+  </label><label><input id="errors-only" type="checkbox"> Only cases with tool errors</label>
+  <button id="clear-filters" type="button">Clear filters</button></div>
   <p id="filter-count" aria-live="polite">Showing {len(results)} of {len(results)} cases</p>
 </section>
 <section aria-label="Tag categories">
@@ -227,7 +269,7 @@ def build_report(results):
   <h2>Case details</h2>
   <div id="case-details">{''.join(detail_rows)}</div>
 </section>
-<p class="note">Charts show execution metrics. These results do not contain correctness grades.</p>
+<p class="note">Tool errors include structured results such as NOT_FOUND and INVALID_INPUT. They do not grade answer correctness.</p>
 <script type="application/json" id="chart-data">{chart_data}</script>
 <script>{script}</script>
 </body>

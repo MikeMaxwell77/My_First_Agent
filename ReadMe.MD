@@ -21,6 +21,8 @@ Customer, Tool, and Attack.
 
 Click a bar, line dot, or pie slice to open and briefly highlight its case in
 the details list. Pie legend entries also link to their cases.
+Cases with tool errors appear in red, with their tool names and error codes in
+the details. Use **Only cases with tool errors** to focus on them.
 
 To rebuild the report from saved results without calling the model, run
 `python evals/view_results.py`.

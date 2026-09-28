@@ -5,6 +5,7 @@ cases.forEach((item, index) => { item.caseIndex = index; });
 const metricKeys = [...new Set(cases.flatMap(item => Object.keys(item.metrics)))].sort();
 const tagFilters = [...document.querySelectorAll("select[data-tag]")];
 const categoryFilter = document.getElementById("category-filter");
+const errorsOnly = document.getElementById("errors-only");
 const charts = document.getElementById("charts");
 const svgNamespace = "http://www.w3.org/2000/svg";
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 });
@@ -31,7 +32,8 @@ function makeCaseLink(element, point) {
   element.classList.add("chart-point");
   element.setAttribute("role", "button");
   element.setAttribute("tabindex", "0");
-  element.setAttribute("aria-label", `View case ${point.id} in case details`);
+  element.setAttribute("aria-label", `View case ${point.id} in case details` +
+    (point.errorCount ? `, ${point.errorCount} tool errors` : ""));
   element.addEventListener("click", () => jumpToCase(point.caseIndex));
   element.addEventListener("keydown", event => {
     if (event.key === "Enter" || event.key === " ") {
@@ -66,6 +68,7 @@ function selectedCases() {
     .map(select => select.dataset.tag);
   return cases.filter(item =>
     (!categoryFilter.value || item.category === categoryFilter.value) &&
+    (!errorsOnly.checked || item.errorCount > 0) &&
     included.every(tag => item.tags.includes(tag)) &&
     excluded.every(tag => !item.tags.includes(tag))
   );
@@ -105,13 +108,14 @@ function drawCartesian(container, points, type) {
   points.forEach((point, index) => {
     const x = left + step * (index + 0.5);
     const yy = y(point.value);
-    const tooltip = `${point.id}${point.name ? ` - ${point.name}` : ""}: ${numberFormat.format(point.value)}`;
+    const tooltip = `${point.id}${point.name ? ` - ${point.name}` : ""}: ${numberFormat.format(point.value)}` +
+      (point.errorCount ? ` (${point.errorCount} tool errors)` : "");
     if (type === "bar") {
       const baseline = y(0);
       const rect = svgElement("rect", {
         x: x - step * 0.34, y: Math.min(yy, baseline),
         width: step * 0.68, height: Math.max(2, Math.abs(baseline - yy)),
-        fill: "#2866c9"
+        fill: point.errorCount ? "#c0392b" : "#2866c9"
       });
       const title = svgElement("title");
       title.textContent = tooltip;
@@ -132,7 +136,9 @@ function drawCartesian(container, points, type) {
       fill: "none", stroke: "#19856d", "stroke-width": 3
     }));
     for (const { x, yy, tooltip, point } of coordinates) {
-      const circle = svgElement("circle", { cx: x, cy: yy, r: 7, fill: "#19856d" });
+      const circle = svgElement("circle", {
+        cx: x, cy: yy, r: 7, fill: point.errorCount ? "#c0392b" : "#19856d"
+      });
       const title = svgElement("title");
       title.textContent = tooltip;
       circle.append(title);
@@ -157,7 +163,7 @@ function drawPie(container, points) {
   legend.className = "legend";
   let angle = -Math.PI / 2;
   points.forEach((point, index) => {
-    const color = `hsl(${(index * 137.5) % 360} 65% 43%)`;
+    const color = point.errorCount ? "#c0392b" : `hsl(${190 + (index * 41) % 120} 65% 43%)`;
     const sweep = point.value / total * Math.PI * 2;
     if (point.value > 0) {
       let slice;
@@ -186,7 +192,8 @@ function drawPie(container, points) {
     swatch.className = "swatch";
     swatch.style.backgroundColor = color;
     const text = document.createElement("span");
-    text.textContent = `${point.id}: ${numberFormat.format(point.value)} (${numberFormat.format(point.value / total * 100)}%)`;
+    text.textContent = `${point.id}: ${numberFormat.format(point.value)} (${numberFormat.format(point.value / total * 100)}%)` +
+      (point.errorCount ? ` - ${point.errorCount} tool errors` : "");
     item.append(swatch, text);
     makeCaseLink(item, point);
     legend.append(item);
@@ -202,6 +209,7 @@ function renderChart(card, filtered) {
   canvas.replaceChildren();
   const points = filtered.filter(item => Object.hasOwn(item.metrics, metric))
     .map(item => ({ id: item.id, name: item.name, caseIndex: item.caseIndex,
+                    errorCount: item.errorCount,
                     value: item.metrics[metric] }));
   note.textContent = `${points.length} of ${filtered.length} filtered cases have ${labelForMetric(metric)}.`;
   if (!points.length) {
@@ -244,9 +252,11 @@ function addChart() {
 }
 
 categoryFilter.addEventListener("change", refresh);
+errorsOnly.addEventListener("change", refresh);
 tagFilters.forEach(select => select.addEventListener("change", refresh));
 document.getElementById("clear-filters").addEventListener("click", () => {
   categoryFilter.value = "";
+  errorsOnly.checked = false;
   tagFilters.forEach(select => { select.value = ""; });
   refresh();
 });

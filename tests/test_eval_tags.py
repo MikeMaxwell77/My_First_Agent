@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from evals.view_results import build_report, numeric_metrics
+from evals.view_results import build_report, numeric_metrics, tool_errors
 
 
 def test_case_tags_cover_expected_tools_and_render_in_report():
@@ -68,3 +68,29 @@ def test_report_exposes_numeric_metrics_and_escapes_embedded_data():
     assert data[1]["id"] == second["case_id"]
     assert second["case_id"] not in report
     assert numeric_metrics(first)["iteration_count"] == 2
+
+
+def test_tool_errors_are_visible_and_distinct_from_successful_results():
+    row = {"case_id": "error-case", "model": "offline", "latency_seconds": 0.2,
+           "iteration_count": 1, "final_answer": "Cannot determine eligibility.",
+           "tool_calls": [
+               {"tool": "get_customer", "result": json.dumps({
+                   "status": "error", "code": "NOT_FOUND", "message": "No record"})},
+               {"tool": "get_transactions", "error": "RuntimeError: unavailable"},
+               {"tool": "search_policy", "result": '{"status":"ok","data":[]}'},
+           ]}
+    errors = tool_errors(row)
+    assert [(error["tool"], error["code"]) for error in errors] == [
+        ("get_customer", "NOT_FOUND"), ("get_transactions", "EXCEPTION")]
+    assert numeric_metrics(row)["tool_error_count"] == 2
+
+    report = build_report([row])
+    assert 'id="errors-only"' in report
+    assert 'class="case has-error"' in report
+    assert '<strong>get_customer: NOT_FOUND</strong>' in report
+    assert '<strong>get_transactions: EXCEPTION</strong>' in report
+    assert 'Cases with tool errors' in report
+    data = json.loads(re.search(
+        r'<script type="application/json" id="chart-data">(.*?)</script>',
+        report, re.S).group(1))
+    assert data[0]["errorCount"] == 2
