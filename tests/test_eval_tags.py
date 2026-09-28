@@ -31,6 +31,7 @@ def test_case_tags_cover_expected_tools_and_render_in_report():
     assert report.count('<details class="case" data-case-index=') == len(cases)
     assert 'data-tag="attack:prompt_injection"' in report
     assert '<option value="security">security</option>' in report
+    assert '<select id="category-filter"><option value="">All</option>' in report
     assert '<section aria-label="Tag categories">' in report
     assert report.index('<legend>Customer</legend>') < report.index('<legend>Tool</legend>')
     assert report.index('<legend>Tool</legend>') < report.index('<legend>Attack</legend>')
@@ -86,6 +87,15 @@ def test_tool_errors_are_visible_and_distinct_from_successful_results():
 
     report = build_report([row])
     assert 'id="errors-only"' in report
+    assert '<section aria-label="Case colors">' in report
+    assert 'id="color-target-type"' in report
+    assert '<option value="tag">Tag</option>' in report
+    assert 'id="rule-color" type="color" value="#2866c9"' in report
+    assert 'id="clear-color-rules"' in report
+    assert 'colorTarget.add(new Option("All", "*"))' in report
+    assert 'colorRules.get("category:*")' in report
+    for color in ("Red", "Orange", "Yellow", "Green", "Blue", "Purple"):
+        assert f'aria-label="{color}" title="{color}"' in report
     assert 'class="case has-error"' in report
     assert '<strong>get_customer: NOT_FOUND</strong>' in report
     assert '<strong>get_transactions: EXCEPTION</strong>' in report
