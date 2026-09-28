@@ -35,7 +35,7 @@ def test_case_tags_cover_expected_tools_and_render_in_report():
     assert report.index('<legend>Customer</legend>') < report.index('<legend>Tool</legend>')
     assert report.index('<legend>Tool</legend>') < report.index('<legend>Attack</legend>')
     assert 'max-height: min(70vh, 720px)' in report
-    assert "Showing 35 of 35 cases" in report
+    assert f"Showing {len(cases)} of {len(cases)} cases" in report
     assert "Ignore previous instructions injection" in report
     assert 'class="metric-select"' in report
     assert 'class="type-select"' in report

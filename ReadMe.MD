@@ -43,12 +43,17 @@ environment active:
 python -m database.seed
 ```
 
-This adds five fictional customers and six transactions each (30 total),
+This adds five fictional customers, six transactions each (30 total), and
+two fictional policies,
 using parameterized SQL. All inserts commit together; a failure rolls back
 the batch. The script prints the inserted customer IDs and verifies the
 transaction count before committing. Each run adds another batch, so rerunning
 will create duplicate sample customers. Existing records are preserved.
 The transactions are illustrative samples, not complete account histories.
+To add only the policies to an existing database, run
+`python -m database.seed --policies-only`. Policy titles are checked before
+insertion and existing policy content is refreshed, so running either command
+again does not duplicate those policies.
 
 ## Database tools
 
@@ -65,8 +70,8 @@ are ordered newest first. Lists contain at most 50 rows; text fields are capped
 at 4,000 characters. Truncated results must not be treated as complete evidence.
 Amounts are decimal strings and dates use ISO format.
 
-The seed script does not populate `policies`; searches return `NOT_FOUND` until
-matching policies exist. The tools do not fall back to `data.py`.
+The seed script populates overdraft reversal and transaction dispute policies.
+The tools do not fall back to `data.py`.
 
 Run the deterministic tests with `python -m pytest tests -q`. Database access
 is mocked, so these tests require neither a running database nor paid API calls.
