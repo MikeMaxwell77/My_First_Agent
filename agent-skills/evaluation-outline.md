@@ -22,7 +22,8 @@ guidance to testing and evaluation logging, not database tool design.
 
 Keep the existing JSONL format and field names:
 
-- `case_id`, `model`, `prompt`, and `final_answer`
+- `case_id`, `category`, `tags`, `model`, `prompt`, and `final_answer`.
+  Tags organize cases in the report; never include them in the agent prompt.
 - `tools_called`: ordered tool names
 - `tool_calls`: ordered tool names, arguments, and results or errors
 - `iteration_count` and `latency_seconds`

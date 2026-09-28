@@ -72,6 +72,7 @@ def build_report(results):
     latency_rows = []
     activity_rows = []
     detail_rows = []
+    all_tags = sorted({tag for row in results for tag in row.get("tags", [])})
 
     for row in results:
         case_id = escape(str(row["case_id"]))
@@ -93,9 +94,14 @@ def build_report(results):
         trajectory = escape(json.dumps(calls, ensure_ascii=False, indent=2))
         prompt = escape(str(row.get("prompt", "")))
         answer = escape(str(row["final_answer"]))
+        tags = row.get("tags", [])
+        tag_list = " ".join(f'<span class="tag">{escape(tag)}</span>' for tag in tags)
+        tag_data = escape(json.dumps(tags), quote=True)
         detail_rows.append(
-            f'<details><summary>{case_id} <span>{latency:.2f} s · '
+            f'<details data-tags="{tag_data}"><summary>{case_id} <span>{latency:.2f} s · '
             f'{iterations} iterations · {len(calls)} calls</span></summary>'
+            f'<p><strong>Category:</strong> {escape(str(row.get("category", "unknown")))}</p>'
+            f'<p><strong>Tags:</strong> {tag_list or "None"}</p>'
             f'<p><strong>Prompt:</strong> {prompt}</p>'
             f'<p><strong>Final answer:</strong> {answer}</p>'
             f'<p><strong>Tools:</strong> {tools}</p>'
@@ -139,6 +145,8 @@ def build_report(results):
   summary {{ cursor: pointer; font-weight: 600; }}
   summary span {{ float: right; font-weight: 400; color: #52627a; }}
   details p {{ line-height: 1.5; overflow-wrap: anywhere; }}
+  .tag {{ display: inline-block; margin: 2px 4px 2px 0; padding: 3px 7px; border-radius: 5px; background: #edf1f7; font-size: .8rem; }}
+  .tag-filter {{ margin-bottom: 12px; }}
   pre {{ white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fb; padding: 12px; border-radius: 6px; font-size: .8rem; }}
   @media (max-width: 640px) {{
     .summary {{ grid-template-columns: 1fr; }}
@@ -170,9 +178,23 @@ def build_report(results):
 </section>
 <section>
   <h2>Case details</h2>
+  <label class="tag-filter">Filter by tag:
+    <select id="tag-filter"><option value="">All cases</option>
+      {''.join(f'<option value="{escape(tag, quote=True)}">{escape(tag)}</option>' for tag in all_tags)}
+    </select>
+  </label>
   {''.join(detail_rows)}
 </section>
 <p class="note">These graphs show speed and tool use. The saved results do not contain correctness grades.</p>
+<script>
+  const filter = document.getElementById('tag-filter');
+  filter.addEventListener('change', () => {{
+    document.querySelectorAll('details[data-tags]').forEach(detail => {{
+      detail.hidden = Boolean(filter.value) &&
+        !JSON.parse(detail.dataset.tags).includes(filter.value);
+    }});
+  }});
+</script>
 </body>
 </html>
 """

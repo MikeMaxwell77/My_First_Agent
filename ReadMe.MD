@@ -10,8 +10,8 @@ python evals/run_evals.py
 
 Open `logs/eval_report.html` in a browser. The report reads the saved
 `logs/eval_results.jsonl` file and shows latency plus iteration and tool-call
-counts for each case. Expand a case to inspect its prompt, final answer, and
-tools used. These are execution metrics; the current JSONL does not contain
+counts for each case. Filter cases by tag, or expand one to inspect its prompt,
+final answer, and tools used. These are execution metrics; the current JSONL does not contain
 correctness grades. Running evaluations calls the model and may incur API costs.
 
 To rebuild the report from saved results without calling the model, run
