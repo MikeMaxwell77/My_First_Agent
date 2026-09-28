@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from agent import TOOL_DEFINITIONS, TOOL_REGISTRY, run_agent  # noqa: E402
+from agent import TOOL_REGISTRY, run_agent  # noqa: E402
 from evals.view_results import build_report  # noqa: E402
 
 
@@ -49,11 +49,7 @@ def main():
 
     with log_path.open("w", encoding="utf-8") as log_file:
         for case in cases:
-            allowed = set(case["expected"]["allowed_tools"])
-            registry = {name: tool for name, tool in TOOL_REGISTRY.items()
-                        if name in allowed}
-            definitions = [definition for definition in TOOL_DEFINITIONS
-                           if definition["name"] in allowed]
+            registry = dict(TOOL_REGISTRY)
             for tool_name in case.get("unavailable_tools", []):
                 registry[tool_name] = unavailable_tool
 
@@ -61,8 +57,7 @@ def main():
             client = (repeating_customer_client(case["setup"]["customer_id"])
                       if behavior == "repeat_get_customer" else None)
             run = run_agent(case["prompt"], client=client,
-                            tool_registry=registry, tool_definitions=definitions,
-                            model=model)
+                            tool_registry=registry, model=model)
             result = {
                 "case_id": case["id"],
                 "category": case["category"],
