@@ -73,18 +73,20 @@ def build_report(results):
     activity_rows = []
     detail_rows = []
     all_tags = sorted({tag for row in results for tag in row.get("tags", [])})
+    all_categories = sorted({str(row["category"]) for row in results if row.get("category")})
 
     for row in results:
         case_id = escape(str(row["case_id"]))
+        case_id_attr = escape(str(row["case_id"]), quote=True)
         latency = float(row["latency_seconds"])
         iterations = int(row["iteration_count"])
         calls = row["tool_calls"]
         latency_rows.append(
-            f'<div class="chart-row"><span class="case">{case_id}</span>'
+            f'<div class="chart-row" data-case-id="{case_id_attr}"><span class="case">{case_id}</span>'
             f'{bar(latency, max_latency, "latency", f"{latency:.2f} s")}</div>'
         )
         activity_rows.append(
-            f'<div class="chart-row"><span class="case">{case_id}</span>'
+            f'<div class="chart-row" data-case-id="{case_id_attr}"><span class="case">{case_id}</span>'
             f'<div class="stack">'
             f'{bar(iterations, max_activity, "iterations", f"{iterations} iterations")}'
             f'{bar(len(calls), max_activity, "calls", f"{len(calls)} tool calls")}'
@@ -97,8 +99,12 @@ def build_report(results):
         tags = row.get("tags", [])
         tag_list = " ".join(f'<span class="tag">{escape(tag)}</span>' for tag in tags)
         tag_data = escape(json.dumps(tags), quote=True)
+        category_data = escape(str(row.get("category", "")), quote=True)
+        case_name = escape(str(row.get("name", "")))
         detail_rows.append(
-            f'<details data-tags="{tag_data}"><summary>{case_id} <span>{latency:.2f} s · '
+            f'<details data-case-id="{case_id_attr}" data-category="{category_data}" '
+            f'data-tags="{tag_data}"><summary>{case_id}'
+            f'{f" — {case_name}" if case_name else ""} <span>{latency:.2f} s · '
             f'{iterations} iterations · {len(calls)} calls</span></summary>'
             f'<p><strong>Category:</strong> {escape(str(row.get("category", "unknown")))}</p>'
             f'<p><strong>Tags:</strong> {tag_list or "None"}</p>'
@@ -147,6 +153,7 @@ def build_report(results):
   details p {{ line-height: 1.5; overflow-wrap: anywhere; }}
   .tag {{ display: inline-block; margin: 2px 4px 2px 0; padding: 3px 7px; border-radius: 5px; background: #edf1f7; font-size: .8rem; }}
   .tag-filter {{ margin-bottom: 12px; }}
+  [hidden] {{ display: none !important; }}
   pre {{ white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fb; padding: 12px; border-radius: 6px; font-size: .8rem; }}
   @media (max-width: 640px) {{
     .summary {{ grid-template-columns: 1fr; }}
@@ -178,22 +185,41 @@ def build_report(results):
 </section>
 <section>
   <h2>Case details</h2>
-  <label class="tag-filter">Filter by tag:
+  <label class="tag-filter">Category:
+    <select id="category-filter"><option value="">All categories</option>
+      {''.join(f'<option value="{escape(category, quote=True)}">{escape(category)}</option>' for category in all_categories)}
+    </select>
+  </label>
+  <label class="tag-filter">Tag:
     <select id="tag-filter"><option value="">All cases</option>
       {''.join(f'<option value="{escape(tag, quote=True)}">{escape(tag)}</option>' for tag in all_tags)}
     </select>
   </label>
+  <p id="filter-count" aria-live="polite">Showing {len(results)} of {len(results)} cases</p>
   {''.join(detail_rows)}
 </section>
 <p class="note">These graphs show speed and tool use. The saved results do not contain correctness grades.</p>
 <script>
-  const filter = document.getElementById('tag-filter');
-  filter.addEventListener('change', () => {{
+  const tagFilter = document.getElementById('tag-filter');
+  const categoryFilter = document.getElementById('category-filter');
+  function applyFilters() {{
+    const visibleIds = new Set();
     document.querySelectorAll('details[data-tags]').forEach(detail => {{
-      detail.hidden = Boolean(filter.value) &&
-        !JSON.parse(detail.dataset.tags).includes(filter.value);
+      const matchesTag = !tagFilter.value ||
+        JSON.parse(detail.dataset.tags).includes(tagFilter.value);
+      const matchesCategory = !categoryFilter.value ||
+        detail.dataset.category === categoryFilter.value;
+      detail.hidden = !(matchesTag && matchesCategory);
+      if (!detail.hidden) visibleIds.add(detail.dataset.caseId);
     }});
-  }});
+    document.querySelectorAll('.chart-row[data-case-id]').forEach(row => {{
+      row.hidden = !visibleIds.has(row.dataset.caseId);
+    }});
+    document.getElementById('filter-count').textContent =
+      `Showing ${{visibleIds.size}} of {len(results)} cases`;
+  }}
+  tagFilter.addEventListener('change', applyFilters);
+  categoryFilter.addEventListener('change', applyFilters);
 </script>
 </body>
 </html>
