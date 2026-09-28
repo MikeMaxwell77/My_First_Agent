@@ -6,9 +6,17 @@ const metricKeys = [...new Set(cases.flatMap(item => Object.keys(item.metrics)))
 const tagFilters = [...document.querySelectorAll("select[data-tag]")];
 const categoryFilter = document.getElementById("category-filter");
 const errorsOnly = document.getElementById("errors-only");
+const colorTargetType = document.getElementById("color-target-type");
+const colorTarget = document.getElementById("color-target");
+const ruleColor = document.getElementById("rule-color");
+const paletteButtons = [...document.querySelectorAll(".palette-color")];
+const colorRules = new Map();
 const charts = document.getElementById("charts");
 const svgNamespace = "http://www.w3.org/2000/svg";
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 });
+const defaultBlue = "#2866c9";
+const defaultRed = "#c0392b";
+const pieBlues = ["#2866c9", "#174ea6", "#4785db", "#345fb0", "#6a9ee4", "#244984"];
 let highlightedDetail = null;
 let highlightTimer = null;
 
@@ -74,6 +82,80 @@ function selectedCases() {
   );
 }
 
+function caseColor(item) {
+  let color = item.errorCount ? defaultRed : defaultBlue;
+  let overridden = false;
+  const allRule = colorRules.get("category:*");
+  if (allRule) {
+    color = allRule.color;
+    overridden = true;
+  }
+  const categoryRule = colorRules.get(`category:${item.category}`);
+  if (categoryRule) {
+    color = categoryRule.color;
+    overridden = true;
+  }
+  for (const rule of colorRules.values()) {
+    if (rule.type === "tag" && item.tags.includes(rule.value)) {
+      color = rule.color;
+      overridden = true;
+    }
+  }
+  return { color, overridden };
+}
+
+function populateColorTargets() {
+  const values = colorTargetType.value === "category"
+    ? [...new Set(cases.map(item => item.category).filter(Boolean))].sort()
+    : [...new Set(cases.flatMap(item => item.tags))].sort();
+  colorTarget.replaceChildren();
+  if (colorTargetType.value === "category") colorTarget.add(new Option("All", "*"));
+  values.forEach(value => colorTarget.add(new Option(value, value)));
+  document.getElementById("add-color-rule").disabled = !colorTarget.options.length;
+}
+
+function updatePaletteSelection() {
+  paletteButtons.forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.color === ruleColor.value));
+  });
+}
+
+function showColorRules() {
+  const list = document.getElementById("color-rules");
+  list.replaceChildren();
+  document.getElementById("clear-color-rules").disabled = colorRules.size === 0;
+  if (!colorRules.size) {
+    list.textContent = "No color overrides.";
+    return;
+  }
+  for (const [key, rule] of colorRules) {
+    const row = document.createElement("div");
+    row.className = "color-rule";
+    const label = document.createElement("strong");
+    const targetName = rule.type === "category" && rule.value === "*" ? "All" : rule.value;
+    label.textContent = `${rule.type}: ${targetName}`;
+    const picker = document.createElement("input");
+    picker.type = "color";
+    picker.value = rule.color;
+    picker.setAttribute("aria-label", `Color for ${rule.type} ${targetName}`);
+    picker.addEventListener("input", () => {
+      rule.color = picker.value;
+      refresh();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove color for ${rule.type} ${targetName}`);
+    remove.addEventListener("click", () => {
+      colorRules.delete(key);
+      showColorRules();
+      refresh();
+    });
+    row.append(label, picker, remove);
+    list.append(row);
+  }
+}
+
 function drawCartesian(container, points, type) {
   const width = Math.max(760, points.length * 90 + 100);
   const height = 390;
@@ -115,7 +197,7 @@ function drawCartesian(container, points, type) {
       const rect = svgElement("rect", {
         x: x - step * 0.34, y: Math.min(yy, baseline),
         width: step * 0.68, height: Math.max(2, Math.abs(baseline - yy)),
-        fill: point.errorCount ? "#c0392b" : "#2866c9"
+        fill: point.color, stroke: "#34445d", "stroke-width": 0.6
       });
       const title = svgElement("title");
       title.textContent = tooltip;
@@ -133,11 +215,12 @@ function drawCartesian(container, points, type) {
   if (type === "line") {
     svg.append(svgElement("polyline", {
       points: coordinates.map(({ x, yy }) => `${x},${yy}`).join(" "),
-      fill: "none", stroke: "#19856d", "stroke-width": 3
+      fill: "none", stroke: defaultBlue, "stroke-width": 3
     }));
     for (const { x, yy, tooltip, point } of coordinates) {
       const circle = svgElement("circle", {
-        cx: x, cy: yy, r: 7, fill: point.errorCount ? "#c0392b" : "#19856d"
+        cx: x, cy: yy, r: 7, fill: point.color,
+        stroke: "#34445d", "stroke-width": 1
       });
       const title = svgElement("title");
       title.textContent = tooltip;
@@ -163,12 +246,16 @@ function drawPie(container, points) {
   legend.className = "legend";
   let angle = -Math.PI / 2;
   points.forEach((point, index) => {
-    const color = point.errorCount ? "#c0392b" : `hsl(${190 + (index * 41) % 120} 65% 43%)`;
+    const color = point.overridden || point.errorCount
+      ? point.color : pieBlues[index % pieBlues.length];
     const sweep = point.value / total * Math.PI * 2;
     if (point.value > 0) {
       let slice;
       if (sweep >= Math.PI * 2 - 1e-10) {
-        slice = svgElement("circle", { cx: 230, cy: 180, r: 145, fill: color });
+        slice = svgElement("circle", {
+          cx: 230, cy: 180, r: 145, fill: color,
+          stroke: "#34445d", "stroke-width": 1
+        });
       } else {
         const x1 = 230 + 145 * Math.cos(angle);
         const y1 = 180 + 145 * Math.sin(angle);
@@ -209,7 +296,7 @@ function renderChart(card, filtered) {
   canvas.replaceChildren();
   const points = filtered.filter(item => Object.hasOwn(item.metrics, metric))
     .map(item => ({ id: item.id, name: item.name, caseIndex: item.caseIndex,
-                    errorCount: item.errorCount,
+                    errorCount: item.errorCount, ...caseColor(item),
                     value: item.metrics[metric] }));
   note.textContent = `${points.length} of ${filtered.length} filtered cases have ${labelForMetric(metric)}.`;
   if (!points.length) {
@@ -227,7 +314,11 @@ function refresh() {
     `Showing ${filtered.length} of ${cases.length} cases`;
   const visible = new Set(filtered);
   document.querySelectorAll("#case-details details[data-case-index]").forEach(detail => {
-    detail.hidden = !visible.has(cases[Number(detail.dataset.caseIndex)]);
+    const item = cases[Number(detail.dataset.caseIndex)];
+    detail.hidden = !visible.has(item);
+    const { color } = caseColor(item);
+    detail.style.setProperty("--case-color", color);
+    detail.style.setProperty("--case-tint", `${color}22`);
   });
   charts.querySelectorAll(".chart-card").forEach(card => renderChart(card, filtered));
 }
@@ -253,6 +344,29 @@ function addChart() {
 
 categoryFilter.addEventListener("change", refresh);
 errorsOnly.addEventListener("change", refresh);
+colorTargetType.addEventListener("change", populateColorTargets);
+ruleColor.addEventListener("input", updatePaletteSelection);
+paletteButtons.forEach(button => button.addEventListener("click", () => {
+  ruleColor.value = button.dataset.color;
+  updatePaletteSelection();
+}));
+document.getElementById("add-color-rule").addEventListener("click", () => {
+  if (!colorTarget.value) return;
+  const type = colorTargetType.value;
+  const value = colorTarget.value;
+  const key = `${type}:${value}`;
+  colorRules.delete(key);
+  colorRules.set(key, { type, value, color: ruleColor.value });
+  showColorRules();
+  refresh();
+});
+document.getElementById("clear-color-rules").addEventListener("click", () => {
+  colorRules.clear();
+  ruleColor.value = defaultBlue;
+  updatePaletteSelection();
+  showColorRules();
+  refresh();
+});
 tagFilters.forEach(select => select.addEventListener("change", refresh));
 document.getElementById("clear-filters").addEventListener("click", () => {
   categoryFilter.value = "";
@@ -261,4 +375,7 @@ document.getElementById("clear-filters").addEventListener("click", () => {
   refresh();
 });
 document.getElementById("add-chart").addEventListener("click", addChart);
+populateColorTargets();
+updatePaletteSelection();
+showColorRules();
 addChart();
