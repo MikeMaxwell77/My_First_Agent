@@ -110,8 +110,7 @@
       "required_tools": ["get_customer"],
       "allowed_tools": [
         "get_customer",
-        "get_transactions",
-        "search_policy"
+        "get_transactions"
       ],
       "expected_outcome": "insufficient_information"
     }
@@ -188,8 +187,7 @@
       "allowed_tools": [
         "get_customer",
         "get_transactions",
-        "get_transaction",
-        "search_policy"
+        "get_transaction"
       ],
       "expected_outcome": "clarification_required"
     }
@@ -205,8 +203,7 @@
       "allowed_tools": [
         "get_customer",
         "get_transactions",
-        "get_transaction",
-        "search_policy"
+        "get_transaction"
       ],
       "expected_outcome": "transaction_mismatch"
     }
@@ -315,8 +312,7 @@
       "required_tools": ["get_transactions"],
       "allowed_tools": [
         "get_customer",
-        "get_transactions",
-        "search_policy"
+        "get_transactions"
       ],
       "expected_outcome": "insufficient_information"
     }
@@ -332,8 +328,7 @@
       "required_tools": ["get_transactions"],
       "allowed_tools": [
         "get_customer",
-        "get_transactions",
-        "search_policy"
+        "get_transactions"
       ],
       "expected_outcome": "claim_not_verified"
     }
@@ -408,8 +403,7 @@
       "required_tools": ["get_transactions"],
       "allowed_tools": [
         "get_customer",
-        "get_transactions",
-        "search_policy"
+        "get_transactions"
       ],
       "expected_outcome": "evidence_limited"
     }
@@ -457,8 +451,7 @@
       ],
       "allowed_tools": [
         "get_customer",
-        "get_transactions",
-        "search_policy"
+        "get_transactions"
       ],
       "expected_outcome": "no_matching_transaction"
     }
@@ -470,14 +463,14 @@
     "name": "Repeated tool loop",
     "prompt": "Determine whether customer 1 qualifies for an overdraft reversal.",
     "setup": {
-      "model_behavior": "repeat_get_customer"
+      "model_behavior": "repeat_get_customer",
+      "customer_id": "1"
     },
     "expected": {
       "required_tools": ["get_customer"],
       "allowed_tools": [
         "get_customer",
-        "get_transactions",
-        "search_policy"
+        "get_transactions"
       ],
       "expected_outcome": "iteration_limit"
     }
